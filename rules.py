@@ -13,7 +13,9 @@ Rule D8 (hot-frit-dominated variant, used by validation target V6):
   4. Porosities, thicknesses, and everything else stay unchanged.
 
 Contract with slice.py: slice_fn(element) must return a dict containing at least
-  "dp_cold_frit" and "dp_hot_frit" (Pa) for that element at nominal steady state.
+  "dp_cold_frit" and "dp_hot_frit" (Pa) for that element at nominal steady state,
+  plus the flags "pressure_collapse" and "out_of_range".
+  A pressure collapse during the pore search is treated as "drop far above target".
 `element` is a dict like params.T19_ELEMENT.
 """
 import numpy as np
@@ -24,7 +26,13 @@ def _solve_pore(element, slice_fn, key_pore, key_dp, target_dp):
     """Pore size (m) that gives target_dp for one frit, searched in log space."""
     def resid(log_d):
         trial = dict(element, **{key_pore: float(np.exp(log_d))})
-        return np.log(slice_fn(trial)[key_dp]) - np.log(target_dp)
+        res = slice_fn(trial)
+        if res.get("pressure_collapse"):
+            # Pore so small the drop exceeds the inlet pressure: far above any target.
+            return 50.0
+        if res.get("out_of_range"):
+            raise RuntimeError(f"D8: slice left the property range at {key_pore} = {np.exp(log_d):.3g} m")
+        return np.log(res[key_dp]) - np.log(target_dp)
 
     lo, hi = np.log(1e-8), np.log(1e-2)        # 10 nm to 1 cm
     if resid(lo) * resid(hi) > 0:
