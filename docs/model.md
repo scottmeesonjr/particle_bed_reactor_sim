@@ -103,3 +103,53 @@ reflector terms zero for the bare element. Point A: b = 0.434, c = 1.070, alpha0
 Vary pore size; report the resulting frit share
 (frit pressure drop / total element pressure drop at nominal steady state).
 "No cold frit" = cold = None.
+
+## Amendment A1 (pre-run decisions; implement before any validation run)
+ 
+### 3a. Continuation and failure rule (item 2)
+A target solve must not report "no solution" because one solver trial point failed.
+- Homotopy parameter lambda from 0 to 1. At lambda, slice power uses the shape
+  F_lambda = 1 + lambda * (F_target - 1) and multipliers 1 + lambda * (mult - 1). At lambda = 0 every
+  slice has the same power, so with channel=False the equal-flow solution exists for uniform frits.
+- Step 1: solve the target directly (lambda = 1) from the equal-flow guess. If it converges, done.
+- Step 2: otherwise solve lambda = 0, then advance lambda with step 0.25, each solve starting from the
+  last converged x. On any failure, halve the step and retry from the last converged point.
+- If the step falls below 1/256 without reaching lambda = 1, stop: "no solution found
+  (continuation exhausted at lambda = ...)", with the reason of the last failed attempt and the last
+  converged state (lambda, flows, peak temperatures).
+- Power sweeps use the same halving rule with power fraction as the parameter: each sweep point
+  starts from the previous converged point; on failure, insert intermediate powers by halving.
+- Results record which path was used (direct or continuation) and the final step size.
+
+### 3b. Element-specific inputs (item 3)
+For geom = a params.py element dict (params.T19_ELEMENT, or the rules.py D8 variant of it):
+- L = geom["L"], dz = L / N. Radii from geom as in section 1.
+- Element power = geom["power_density"] * pi * (r_bed_out^2 - r_hotfrit_out^2) * L.
+- T_in = geom["T_inlet"]; reference pressure = geom["P"].
+- cold_profile=None means THIS element's published cold frit: (geom["cold_frit_pore"],
+  geom["cold_frit_eps"]). Default hot frit: (geom["hot_frit_pore"], geom["hot_frit_eps"]).
+- geom=None: all of the above from params.py (unchanged).
+- T19_LARGE_REACTOR is Tier 2 and is not decided here.
+
+### 3c. Pressure reference (item 3)
+- pressure_ref="outlet" (default): channel exit pressure = reference pressure (as now).
+- pressure_ref="inlet": plenum inlet pressure at z = 0 = reference pressure. The unknown becomes the
+  outlet: x_N = (p_ref - p_out) / P_SCALE. With channel=False every slice has p_in = p_ref and
+  p_out = p_ref - x_N * P_SCALE.
+
+### 3d. Per-slice power multipliers (app disturbance)
+- Optional power_multipliers (length N, default all ones), applied after the shape is renormalized:
+  q_i = element power * power_frac * F_i * mult_i / N. A disturbance adds power; total power rises.
+
+### 1a. Radial profile output (app only)
+- slice_dp(..., profile=False). If True, also return r_nodes, T_gas_nodes, T_fuel_nodes at the
+  n_r + 1 bed nodes, ordered outer to inner. Values are unchanged; this only exposes them.
+  
+### 5a. stability.py interface (used by model.py)
+Both take the dict returned by steady.solve_element at a converged point.
+- static_check(result) -> {"ledinegg": bool, "det_sign": +1 or -1}
+  ledinegg = any slice with d(dp_slice_i)/d(m_i) < 0; det_sign = sign of slogdet of the residual
+  Jacobian.
+- eigen_check(result) -> {"max_real": float, "oscillatory": bool}
+  max_real = largest real part of the transient-model Jacobian eigenvalues (section 5);
+  oscillatory = that eigenvalue has a nonzero imaginary part.
