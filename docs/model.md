@@ -70,6 +70,15 @@ Sensitivity cases (not default): Ergun for the bed; Wakao-Kaguei Nu = 2 + 1.1 Pr
   R_N+1 = (sum(m_i) - m_total) / m_total.
 - channel=False: p_ch = P_OUTLET and p_pl = p_in everywhere (all slices share one pressure drop).
 - Solve with scipy.optimize.root (hybr); continuation in power from the previous converged point.
+- Slice power: q_i = element power * power_frac * F_i / N, where F_i is params.power_shape
+  averaged over slice i at 50 evenly spaced points inside it (midpoints of 50 equal
+  sub-intervals), and the N values F_i are then renormalized to mean exactly 1.
+- Cold frit per slice: cold_profile = None (published constant cold frit), "none" (no cold
+  frit), or a callable cold_profile(s_i) -> (pore, porosity), with s_i = slice-centre z_i / L.
+  Ji et al. profile: pore = params.COLD_FRIT_PORE, porosity = params.cold_frit_porosity(s_i, ...).
+- Stated limitation: the model cannot represent reverse flow in a slice. A trial or solution
+  with m_i <= 0 stops the solve with reason "nonpositive_flow" and is reported as
+  "no solution found".
 
 ## 4. Mass flow
 - Nominal: params.nominal_mass_flow() (rule D2). Throttled: m(P) = m_nom * P / P_nom.
