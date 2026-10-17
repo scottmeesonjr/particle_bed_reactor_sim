@@ -1,3 +1,4 @@
+3d0ffee
 # Validation criteria (pre-registered)
 
 Committed with `params.py`, `properties.py`, `rules.py`, and `data/` in one freeze commit, before any validation run. Every result file records the commit hash. Results are never used to change anything in this file or the frozen code.
