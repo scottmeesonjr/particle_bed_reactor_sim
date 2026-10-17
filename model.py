@@ -134,12 +134,15 @@ def find_onset(case, power_fractions, method):
         raise ValueError(f"method must be 'slope' or 'eigen' (got {method!r})")
     _require_stability()
     unstable, no_solution, x0, first_sign = [], [], None, None
+    prev_f = None
     for f in sorted(power_fractions, reverse=True):
         res = _solve_case(case, power_frac=f, x0=x0)
+        if not res["converged"] and prev_f is not None:
+            res = _halve_toward(case, prev_f, x0, f)     # docs/model.md 3a, power sweeps
         if not res["converged"]:
             no_solution.append(float(f))
             continue
-        x0 = res["x"]
+        prev_f, x0 = f, res["x"]
         st = _point_stability(res)
         if first_sign is None:
             first_sign = st["det_sign"]
@@ -151,6 +154,23 @@ def find_onset(case, power_fractions, method):
             unstable.append(float(f))
     return dict(unstable_fractions=sorted(unstable), no_solution_fractions=sorted(no_solution),
                 onset_fraction=max(unstable) if unstable else None)
+
+
+def _halve_toward(case, f_from, x_from, f_target):
+    """Reach f_target from the last converged sweep point by intermediate powers,
+    halving the step on failure; give up below 1/256 of the original gap."""
+    gap = f_from - f_target
+    step, f_cur, x_cur, res = gap / 2.0, f_from, x_from, None
+    while f_cur - f_target > 1e-12:
+        f_try = max(f_target, f_cur - step)
+        res = _solve_case(case, power_frac=f_try, x0=x_cur)
+        if res["converged"]:
+            f_cur, x_cur = f_try, res["x"]
+        else:
+            step /= 2.0
+            if step < gap / 256.0:
+                return res
+    return res
 
 
 def nominal_slice(element):
@@ -222,9 +242,9 @@ def solve(power_fraction, power_shape, cold_frit_on, cold_frit_porosity,
     # Radial profiles for the bed map, if slice.py exposes them (docs/model.md section 1a).
     gas_T = fuel_T = r = None
     if _supports(sl.slice_dp, "profile") and not channel_on:   # channel on: per-slice pressures differ
-        cold_list, hot = steady._slice_inputs(power_fraction, power_shape, cold, (hot_frit_pore, P.HOT_FRIT_EPS), n_slices)[2:]
-        prof = [sl.slice_dp(res["m"][i], res["q"][i], res["p_in"], P.T_INLET, cold_list[i], hot,
-                            P.L_ELEMENT / n_slices, n_radial, profile=True) for i in range(n_slices)]
+        si = res["slice_inputs"]
+        prof = [sl.slice_dp(res["m"][i], si["q"][i], si["p_in"], si["T_in"], si["colds"][i], si["hot"],
+                            si["dz"], si["n_r"], geom=si["geom"], profile=True) for i in range(n_slices)]
         r = np.asarray(prof[0]["r_nodes"])
         gas_T = np.array([p_["T_gas_nodes"] for p_ in prof])
         fuel_T = np.array([p_["T_fuel_nodes"] for p_ in prof])

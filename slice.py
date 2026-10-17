@@ -103,7 +103,7 @@ def _march(r_start, r_end, n_r, p0, h0, rhs, observe=None):
 # ----------------------------------------------------------------------------
 # One slice
 # ----------------------------------------------------------------------------
-def slice_dp(m_dot, q_slice, p_in, T_in, cold, hot, dz, n_r, geom=None):
+def slice_dp(m_dot, q_slice, p_in, T_in, cold, hot, dz, n_r, geom=None, profile=False):
     """docs/model.md section 1.
 
     m_dot   slice mass flow, kg/s (> 0)
@@ -115,6 +115,8 @@ def slice_dp(m_dot, q_slice, p_in, T_in, cold, hot, dz, n_r, geom=None):
     dz      slice height, m
     n_r     midpoint steps per layer
     geom    None (nominal element) or a params.py geometry dict
+    profile if True, also return the bed-node profiles r_nodes, T_gas_nodes,
+            T_fuel_nodes (n_r + 1 nodes, outer to inner); docs/model.md 1a
 
     Returns a dict: dp, T_gas_out, T_fuel_max, p_out, flags re_m_low,
     re_ht_low, out_of_range, pressure_collapse, fuel_over_limit, plus the
@@ -135,6 +137,7 @@ def slice_dp(m_dot, q_slice, p_in, T_in, cold, hot, dz, n_r, geom=None):
     flags = dict(re_m_low=False, re_ht_low=False, out_of_range=False,
                  pressure_collapse=False, fuel_over_limit=False)
     T_fuel_max = -math.inf
+    nodes_r, nodes_Tg, nodes_Tf = [], [], []
 
     # --- Layer 1: cold frit (adiabatic, T = T_in) ---------------------------
     def frit_rhs(T, d, eps):
@@ -160,7 +163,10 @@ def slice_dp(m_dot, q_slice, p_in, T_in, cold, hot, dz, n_r, geom=None):
             flags["re_ht_low"] = True
         h_c = _kta_nu(Re, mu_T * cp_T / k_T, alpha) * k_T / d_p
         a = 6.0 * (1.0 - alpha) / d_p
-        T_fuel_max = max(T_fuel_max, T_g + q3 / (h_c * a))
+        T_f = T_g + q3 / (h_c * a)
+        T_fuel_max = max(T_fuel_max, T_f)
+        if profile:
+            nodes_r.append(r); nodes_Tg.append(T_g); nodes_Tf.append(T_f)
 
     try:
         h_in = float(pr.h(T_in))
@@ -178,10 +184,16 @@ def slice_dp(m_dot, q_slice, p_in, T_in, cold, hot, dz, n_r, geom=None):
         key = "out_of_range" if isinstance(err, PropertyRangeError) else "pressure_collapse"
         flags[key] = True
         nan = math.nan
-        return dict(dp=nan, T_gas_out=nan, T_fuel_max=nan, p_out=nan,
-                    dp_cold_frit=nan, dp_bed=nan, dp_hot_frit=nan, **flags)
+        out = dict(dp=nan, T_gas_out=nan, T_fuel_max=nan, p_out=nan,
+                   dp_cold_frit=nan, dp_bed=nan, dp_hot_frit=nan, **flags)
+        if profile:
+            out.update(r_nodes=None, T_gas_nodes=None, T_fuel_nodes=None)
+        return out
 
     flags["fuel_over_limit"] = T_fuel_max > P.T_LIMIT
-    return dict(dp=p_in - p3, T_gas_out=T_out, T_fuel_max=T_fuel_max, p_out=p3,
-                dp_cold_frit=p_in - p1, dp_bed=p1 - p2, dp_hot_frit=p2 - p3,
-                **flags)
+    out = dict(dp=p_in - p3, T_gas_out=T_out, T_fuel_max=T_fuel_max, p_out=p3,
+               dp_cold_frit=p_in - p1, dp_bed=p1 - p2, dp_hot_frit=p2 - p3,
+               **flags)
+    if profile:
+        out.update(r_nodes=nodes_r, T_gas_nodes=nodes_Tg, T_fuel_nodes=nodes_Tf)
+    return out

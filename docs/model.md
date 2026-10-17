@@ -55,39 +55,14 @@ Sensitivity cases (not default): Ergun for the bed; Wakao-Kaguei Nu = 2 + 1.1 Pr
 - Z pattern: plenum fed at z = 0, channel exits at z = L, both flow upward.
 - Plenum flow W_pl(z) = m_total - (slice flows already drawn); channel flow W_ch(z) = sum of slice
   flows below z.
-- Momentum balance on a manifold length (flow direction): A dp = -d(W u) + u_x dW - friction,
-  where u = W / (rho * A) and u_x is the axial velocity carried by gas joining (dW > 0) or
-  leaving (dW < 0) the stream.
-  Channel: inflow carries no axial momentum (u_x = 0):
-    dp = -Delta(W^2 / (rho * A^2)) - f_D * W^2 / (2 * rho * A^2 * D_h) * dz
-    A = pi * R_ch^2, D_h = 2 * R_ch.
-  Plenum: leaving gas takes its axial momentum (u_x = u), so A dp = -W du (recovery = 1/2 rho u^2):
-    dp = -(W / A) * Delta(W / (rho * A)) - f_D * W^2 / (2 * rho * A^2 * D_h) * dz
-    A = pi * (R_el^2 - R_cf^2), D_h = 2 * (R_el - R_cf).
-    Discretized between two points a, b with W = (W_a + W_b) / 2 multiplying Delta(W / (rho A)),
-    which is exactly -1/2 Delta(W^2 / (rho A^2)) at constant density.
-  Correction note: an earlier version used -Delta(W^2 / (rho * A^2)) for the plenum too. That
-  recovers rho u^2, twice the dynamic pressure, and contradicts the stated assumption (leaving gas
-  takes its momentum). The plenum equation was corrected to match that assumption; it was not
-  tuned to any result.
+- Between slice centers, in the flow direction:
+  dp = -Delta(W^2 / (rho * A^2)) - f_D * W^2 / (2 * rho * A^2 * D_h) * dz
+  Channel: A = pi * R_ch^2, D_h = 2 * R_ch; entering gas carries no axial momentum.
+  Plenum: A = pi * (R_el^2 - R_cf^2), D_h = 2 * (R_el - R_cf); leaving gas takes its momentum
+  (full pressure recovery; stated assumption).
   Petukhov: f_D = (0.790 * ln(Re) - 1.64)^-2, Re = W * D_h / (A * mu).
-- Discretization:
-  - Slice i draws from the plenum and enters the channel at its centre z_i. The manifold flow
-    at z_i excludes slice i (W_ch = flows below z_i; W_pl = flow not yet drawn). Each segment
-    between centres i and i+1 carries the flow after slice i.
-  - Half segments at the ends: plenum z = 0 -> z_0 (flow = total), channel z_(N-1) -> L
-    (flow = total). No segment where the flow is zero (channel bottom, plenum top).
-  - Friction uses the local density: rho(T, mean of the segment's end pressures). The implicit
-    end density is solved by fixed-point iteration.
-  - During solver iterations the plenum is fed by sum(m_i) (equal to m_total at the solution),
-    so trial points stay mass-consistent.
-- Channel temperature: enthalpy-weighted mix of slice outflows. Plenum gas at T_INLET.
+- Channel temperature: enthalpy-weighted mix of slice outflows.
 - Channel marched down from p(L) = P_OUTLET; plenum marched up from unknown p_in.
-  pressure_ref = "inlet": p_in fixed at the reference pressure, outlet pressure unknown.
-- Flags and failures: any channel or plenum segment with Re < 3000 is flagged (outside the
-  Petukhov range, D6). TODO: move the constant to params.py as RE_MIN_PETUKHOV (currently in
-  steady.py). Re <= 8 makes Petukhov undefined: the solve stops with reason "friction_undefined".
-- Tier 3 sensitivity: plenum recovery factor (fraction of 1/2 rho u^2 recovered; default 1).
 
 ## 3. Full element: N + 1 system
 - Unknowns (scaled): x_i = m_i / m_avg (i = 1..N); x_N+1 = (p_in - P_OUTLET) / 5e5.
@@ -130,7 +105,7 @@ Vary pore size; report the resulting frit share
 "No cold frit" = cold = None.
 
 ## Amendment A1 (pre-run decisions; implement before any validation run)
- 
+
 ### 3a. Continuation and failure rule (item 2)
 A target solve must not report "no solution" because one solver trial point failed.
 - Homotopy parameter lambda from 0 to 1. At lambda, slice power uses the shape
@@ -169,12 +144,13 @@ For geom = a params.py element dict (params.T19_ELEMENT, or the rules.py D8 vari
 ### 1a. Radial profile output (app only)
 - slice_dp(..., profile=False). If True, also return r_nodes, T_gas_nodes, T_fuel_nodes at the
   n_r + 1 bed nodes, ordered outer to inner. Values are unchanged; this only exposes them.
-  
+
 ### 5a. stability.py interface (used by model.py)
 Both take the dict returned by steady.solve_element at a converged point.
 - static_check(result) -> {"ledinegg": bool, "det_sign": +1 or -1}
   ledinegg = any slice with d(dp_slice_i)/d(m_i) < 0; det_sign = sign of slogdet of the residual
   Jacobian.
+- C_i in section 5 uses fuel_cp at T_mean,i = (T_in + T_out,i) / 2, the mean of the linear profile.
 - eigen_check(result) -> {"max_real": float, "oscillatory": bool}
   max_real = largest real part of the transient-model Jacobian eigenvalues (section 5);
   oscillatory = that eigenvalue has a nonzero imaginary part.

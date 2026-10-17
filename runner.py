@@ -73,9 +73,12 @@ J19B_ELEMENT = dict(
 )
 
 
+CHANNEL_ON = True     # set False by --channel-off (validation.md fallback: V6-V9 run with channel off)
+
+
 def case(element, **kw):
     base = dict(element=element, power_shape="uniform", cold_frit="published",
-                m_dot=element["m_dot"], channel_on=True, pressure_ref="outlet")
+                m_dot=element["m_dot"], channel_on=CHANNEL_ON, pressure_ref="outlet")
     base.update(kw)
     return base
 
@@ -191,6 +194,8 @@ def git_state():
 
 
 def run_all(model, channel_off=False):
+    global CHANNEL_ON
+    CHANNEL_ON = not channel_off
     refs = ("outlet", "inlet")
     results = []
     for vid, spec in p.VALIDATION.items():
