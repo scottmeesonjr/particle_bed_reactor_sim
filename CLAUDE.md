@@ -1,4 +1,3 @@
-cat > CLAUDE.md << 'EOF'
 # Project rules for Claude Code
 Particle bed reactor stability simulator (SwampHacks XII). Python.
 
@@ -16,7 +15,7 @@ Particle bed reactor stability simulator (SwampHacks XII). Python.
 ## Interfaces (as frozen; read the files for exact names)
 - properties.py: h(T), T_from_h(h), cp(T), mu(T), k(T), rho(T, P).
   Only rho takes pressure. Catch PropertyRangeError; never extrapolate.
-- params.py: geometry, frit values, T_LIMIT (3800 K design limit), P_OUT, T_IN,
+- params.py: geometry, frit values, T_LIMIT (3800 K design limit), P_OUTLET, T_INLET,
   power_shape, nominal_mass_flow, porosity-profile function. Use these; never retype numbers.
 
 ## Anti-hardcoding rules
@@ -29,4 +28,3 @@ Particle bed reactor stability simulator (SwampHacks XII). Python.
 - SI units. Pressure drop positive = pressure falls along the flow.
 - Slice i = 0 at the bottom; channel exits at the top (Z pattern).
 - Run pytest before every commit. Save results to results/ with the git commit hash.
-EOF

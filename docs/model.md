@@ -1,4 +1,3 @@
-cat > docs/model.md << 'EOF'
 # Model specification (implement exactly; frozen with v3 decisions)
 
 ## 0. Conventions
@@ -11,10 +10,12 @@ cat > docs/model.md << 'EOF'
   Only rho takes pressure. PropertyRangeError is raised outside the data range: catch it, flag it,
   never extrapolate.
 
-## 1. One slice: slice_dp(m_dot, q_slice, p_in, T_in, cold, hot, dz, n_r)
+## 1. One slice: slice_dp(m_dot, q_slice, p_in, T_in, cold, hot, dz, n_r, geom=None)
 Inputs: m_dot = slice mass flow (kg/s); q_slice = slice power (W); p_in = pressure at the cold frit
 outer face (Pa); T_in (K); cold = None (no cold frit) or (pore_size_m, porosity);
-hot = (pore_size_m, porosity); dz = slice height (m); n_r = steps per layer.
+hot = (pore_size_m, porosity); dz = slice height (m); n_r = steps per layer;
+geom = None (nominal element from params.py) or a geometry dict defined in params.py
+(e.g. params.T19_ELEMENT). Geometry values are never defined outside params.py.
 
 Definitions:
 - q''' = q_slice / V_bed_slice, with V_bed_slice = pi * (R_bed_outer^2 - R_hotfrit_outer^2) * dz
@@ -32,7 +33,7 @@ Layer 2, bed (R_bed_outer -> R_hotfrit_outer). Heat released only here.
 - Pressure (KTA 3102.3): dp/ds = f * (1-alpha)/alpha^3 * G^2 / (2 * rho * d_p)
   with f = 320 / (Re/(1-alpha)) + 6 / (Re/(1-alpha))^0.1 and Re = G * d_p / mu.
 - Energy: dh/ds = q''' * 2 * pi * r * dz / m_dot; gas T = T_from_h(h).
-- Fuel (particle surface) temperature at each step: T_f = T_g + q''' / (h_c * a)
+- Fuel (particle surface) temperature at each of the n_r + 1 bed nodes (not the midpoints): T_f = T_g + q''' / (h_c * a)
   with a = 6 * (1-alpha) / d_p, h_c = Nu * k / d_p, Pr = mu * cp / k, and (KTA 3102.2)
   Nu = 1.27 * Pr^(1/3) * Re^0.36 / alpha^1.18 + 0.033 * Pr^(1/2) * Re^0.86 / alpha^1.07.
   Particle internal conduction is neglected (stated limitation).
@@ -41,10 +42,13 @@ Layer 3, hot frit (R_hotfrit_outer -> R_channel). Adiabatic: T = bed outlet temp
 - Full Ergun as in layer 1 with the hot frit's pore size and porosity.
 
 Returns: dp (= p_in - p at channel face), T_gas_out, T_fuel_max, p_out, and flags:
-- re_m_low: any bed step with Re/(1-alpha) < 10 (KTA pressure-drop range)
-- re_ht_low: any bed step with Re < 100 (KTA heat-transfer range)
+- re_m_low: any bed node with Re/(1-alpha) < 10 (KTA pressure-drop range)
+- re_ht_low: any bed node with Re < 100 (KTA heat-transfer range)
 - out_of_range: PropertyRangeError caught; stop the march, return NaN values with this flag
+- pressure_collapse: pressure reaches 0 or below anywhere in the march; stop, return NaN
+  values with this flag
 - fuel_over_limit: T_fuel_max > params.T_LIMIT
+Also returned: dp_cold_frit, dp_bed, dp_hot_frit (per-layer drops, Pa; 0 for no cold frit).
 Sensitivity cases (not default): Ergun for the bed; Wakao-Kaguei Nu = 2 + 1.1 Pr^(1/3) Re^0.6.
 
 ## 2. Plenum and channel
@@ -58,13 +62,13 @@ Sensitivity cases (not default): Ergun for the bed; Wakao-Kaguei Nu = 2 + 1.1 Pr
   (full pressure recovery; stated assumption).
   Petukhov: f_D = (0.790 * ln(Re) - 1.64)^-2, Re = W * D_h / (A * mu).
 - Channel temperature: enthalpy-weighted mix of slice outflows.
-- Channel marched down from p(L) = P_OUT; plenum marched up from unknown p_in.
+- Channel marched down from p(L) = P_OUTLET; plenum marched up from unknown p_in.
 
 ## 3. Full element: N + 1 system
-- Unknowns (scaled): x_i = m_i / m_avg (i = 1..N); x_N+1 = (p_in - P_OUT) / 5e5.
+- Unknowns (scaled): x_i = m_i / m_avg (i = 1..N); x_N+1 = (p_in - P_OUTLET) / 5e5.
 - Residuals: R_i = [p_pl(z_i) - p_ch(z_i) - dp_slice_i] / 5e5;
   R_N+1 = (sum(m_i) - m_total) / m_total.
-- channel=False: p_ch = P_OUT and p_pl = p_in everywhere (all slices share one pressure drop).
+- channel=False: p_ch = P_OUTLET and p_pl = p_in everywhere (all slices share one pressure drop).
 - Solve with scipy.optimize.root (hybr); continuation in power from the previous converged point.
 
 ## 4. Mass flow
@@ -90,4 +94,3 @@ reflector terms zero for the bare element. Point A: b = 0.434, c = 1.070, alpha0
 Vary pore size; report the resulting frit share
 (frit pressure drop / total element pressure drop at nominal steady state).
 "No cold frit" = cold = None.
-EOF
