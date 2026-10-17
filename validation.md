@@ -1,60 +1,52 @@
-3d0ffee
-# Validation criteria (pre-registered)
+# Validation Criteria — Particle Bed Stability Simulator
+Committed before any validation run. Every result file records the commit hash.
+No input or model choice may be changed to improve agreement with these targets.
 
-Committed with `params.py`, `properties.py`, `rules.py`, and `data/` in one freeze commit, before any validation run. Every result file records the commit hash. Results are never used to change anything in this file or the frozen code.
+## Definitions (fixed now)
+- "No cold frit": cold frit layer removed (zero pressure drop).
+- "Strong cold frit": the element's published cold frit (J19b: 2 µm, porosity 0.5; T19: 2 µm, porosity 0.4).
+- Frit share: pressure drop across that frit / total element pressure drop, at nominal steady state.
+- Power sweep: 5%–100% of nominal in steps of 2.5%. Mass flow scaled with power (3000 K outlet rule).
+- Unstable: any eigenvalue with positive real part, OR a sign change of the Jacobian determinant
+  along the continuation path. "No converged solution" is reported separately.
+- Static and oscillatory instabilities are reported separately.
 
-## Decision D13 (added before freeze): property limit and V6
-
-The v3 text of V6 passes on "no steady solution below 8000 K." The sourced property data stop below that: the Svehla transport fits end at 5000 K, the JANAF H₂ table at 6000 K, and hydrogen dissociation (not modeled) becomes important in that range. Therefore:
-
-- `properties.py` covers 150–5000 K and raises `PropertyRangeError` above 5000 K.
-- The solver reports any case that leaves the property range as **"no steady solution within the property range."**
-- V6 is amended to: *instability, or no steady solution with all temperatures below the property limit (5000 K).*
-
-This was decided from the data's range, before any result existed.
-
-## Criteria (v3 Section 6)
-
-All runs use the source's stated inputs. Because of the systematic enthalpy difference (D2), temperature criteria compare directions and relative changes, not absolute values.
-
+## Targets
 | ID | Tier | Target | Pass criterion |
-| V5 | 1 | T19 element, cold-frit-dominated: Δp = 1189.2 kPa | Within ±25%; stable |
-| V6 | 1 | T19 element, hot-frit-dominated (rule D8) | Instability, or no steady solution with all temperatures below 5000 K (D13) |
-| V7 | 1 | No cold frit at design exit temperature [K93] | Static instability below a power density within a factor of 3 of 4 MW/L |
-| V8 | 1 | Strong cold frit [K93] | V7 instability disappears |
-| V9 | 1 | Ledinegg check | Eigenvalue and pressure-drop-slope onsets agree within one sweep step |
-| V10 | 1 | J19b preliminary design, uniform power, 0.505 kg/s: Δp = 529.8 kPa | Within ±25% |
-| V11 | 1 | Cosine vs. uniform power: peak temperature rises (3348.4 → 3905.5 K); Δp essentially unchanged | Peak temperature rises; Δp changes by less than 2% |
-| V12 | 1 | J19b point A, cosine power: peak temperature and Δp both fall (to 3147.6 K and 414.4 kPa) | Both fall; Δp within ±25% of 414.4 kPa |
+|----|------|--------|----------------|
 | V1 | 2 | T19 larger reactor, Z: Δp = 872.4 kPa | Within ±25% |
-| V2 | 2 | Z vs. U | U lower peak temperature; Δp changes by less than 2% |
+| V2 | 2 | Z vs U: peak temperature falls, Δp nearly unchanged | U lower peak temperature; Δp changes < 2% |
 | V3 | 2 | Core heights 80/100/120 cm | Δp within ±25% each; β decreases with shorter core |
-| V4 | 2 | Frit-dominance variants | Both lower peak temperature vs. baseline |
-| V13 | 3 | Reproduction-mode optimizer, cosine power | Chosen design has porosity peak upstream of the power peak (b < 0.5) |
+| V4 | 2 | T19 frit-dominance variants | Both lower peak temperature vs baseline |
+| V5 | 1 | T19 element, cold-frit-dominated: Δp = 1189.2 kPa | Within ±25%; stable |
+| V6 | 1 | T19 element, hot-frit-dominated (D8 rule) | Instability, or no steady solution below 8000 K |
+| V7 | 1 | No cold frit at design exit temperature (Kerrebrock) | Static instability below a power density within a factor of 3 of 4 MW/L |
+| V8 | 1 | Strong cold frit (Kerrebrock) | V7 instability disappears |
+| V9 | 1 | Ledinegg check | Eigenvalue onset and pressure-drop-slope onset agree within one sweep step |
+| V10 | 1 | J19b preliminary design, uniform power, 0.505 kg/s: Δp = 529.8 kPa | Within ±25% |
+| V11 | 1 | Cosine vs uniform: peak temp rises (3348.4 → 3905.5 K), Δp essentially unchanged | Peak temperature rises; Δp changes < 2% |
+| V12 | 1 | J19b point A, cosine power: peak temp and Δp fall (to 3147.6 K, 414.4 kPa) | Both fall vs our cosine baseline; Δp within ±25% of 414.4 kPa |
+| V13 | 3 | Reproduction-mode NSGA-II, cosine power | Chosen design has porosity peak upstream of power peak (b < 0.5) |
 
-Expected disagreements to report, not fix: absolute temperatures (D2); 1D model vs. 2D CFD; parallel-passage limitation at low Reynolds number [K93]; J19b's CFD treats the flow as incompressible, while our model includes density change.
+## Input rules for validation runs
+- Published inputs exactly (J19b: 0.505 kg/s, 20 MW/L, 200 K inlet, 7.0 MPa outlet, Z pattern).
+- T19 cases: run twice, with 8.0 MPa at the outlet and 8.0 MPa at the inlet; report both.
+- Temperature criteria compare directions and changes only (systematic enthalpy difference, v3 D2).
 
-## Fallback rule
+## Fallback (fixed now)
+If the channel and plenum model is not passing its tests by hour 7:30, V5, V10, V11, and V12
+are marked NOT RUN. V6–V9 run with channel effects off, and the app states this.
 
-If the channel and plenum model is not passing its tests at the 7:30 checkpoint, V5, V10, V11, and V12 are marked **"not run."** They are never run in a reduced form. V6–V9, Q1, and Q2 continue with channel effects off, and the app says so.
+## Hypotheses (recorded either way)
+- H1: No cold frit → slice Δp-vs-flow curve has a minimum; published cold frit → rises steadily. (K93, T19)
+- H2: No cold frit at 3000 K outlet → static instability below about 4 MW/L. (K93)
+- H3: A sufficient cold frit removes the H2 instability. (K93)
+- H4: At 20–30 MW/L with 0.5 mm particles, hot-frit-dominated is unstable; cold-frit-dominated is stable. (T19)
+- H5: Cosine power raises peak temperature with almost no Δp change. (J19b)
+- H6: Point A lowers peak temperature and Δp under cosine power. (J19b)
+- H7: U reduces nonuniformity vs Z. (T19, Tier 2)
+- Q4: No hypothesis — whether point A stays stable over 20–100% throttle is open.
 
-## Pressure-reference rule
-
-The Tsinghua (T19) cases state 8.0 MPa without saying where it applies. Each T19 case is run twice: once with 8.0 MPa at the element outlet and once at the inlet. Both results are reported.
-
-## Correlation range flags
-
-Runs are flagged, never stopped, when the bed's modified Reynolds number Re_m = Re/(1 − ε) falls below 10 (KTA pressure drop; range 10 < Re_m < 10⁵ per Reger et al., arXiv:2203.05041) or Re falls below 100 (KTA heat transfer).
-
-## Hypotheses
-
-| ID | Hypothesis | Source |
-| --- | --- | --- |
-| H1 | With no cold frit, a slice's pressure drop vs. flow curve has a minimum. With the published cold frit, it rises steadily. | Kerrebrock; Tsinghua |
-| H2 | With no cold frit at a 3000 K outlet, static instability appears below about 4 MW/L. | Kerrebrock |
-| H3 | A sufficient cold frit removes the H2 instability. | Kerrebrock |
-| H4 | At 20–30 MW/L with 0.5 mm particles, a hot-frit-dominated element is unstable and a cold-frit-dominated one is stable. | Tsinghua |
-| H5 | Cosine power raises peak temperature over uniform, with almost no change in pressure drop. | Ji et al. |
-| H6 | Point A lowers both peak temperature and pressure drop under cosine power. | Ji et al. |
-| H7 | U reduces flow nonuniformity vs. Z (Tier 2). | Tsinghua |
-| Q4 | Does point A stay stable from 20% to 100% throttle? No prediction. | — |
+## Known expected disagreements (report, do not fix)
+Absolute temperatures; 1D model vs 2D CFD; parallel-passage limitation at low Reynolds number (K93);
+J19b CFD treats flow as incompressible.

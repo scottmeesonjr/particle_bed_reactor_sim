@@ -1,0 +1,9 @@
+# H2 transport coefficients, Svehla (1995) NASA TM-4647, Table III, p. 21
+# ln(eta) or ln(lambda) = A*ln(T) + B/T + C/T^2 + D
+# eta in micropoise (x1e-7 -> Pa*s); lambda in microW/(cm*K) (x1e-4 -> W/(m*K))
+# Intervals forced to match at 0.01 K below 1000 K (report p. 4)
+property,T_low,T_high,A,B,C,D
+viscosity,200.0,1000.0,0.74553182,43.555109,-3257.9340,0.13556243
+viscosity,1000.0,5000.0,0.96730605,679.31897,-210251.79,-1.8251697
+conductivity,200.0,1000.0,1.0240124,297.09752,-31396.363,1.0560824
+conductivity,1000.0,5000.0,1.0611992,258.85783,6316.3191,0.79973205
