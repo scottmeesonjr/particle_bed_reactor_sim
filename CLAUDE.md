@@ -9,7 +9,7 @@ Particle bed reactor stability simulator (SwampHacks XII). Python.
 
 ## Ownership
 - Anthonie: slice.py, steady.py, stability.py, transient.py, make_*.py
-- Scott: params.py, properties.py, rules.py, app.py, runner.py, tests/
+- Scott: params.py, properties.py, rules.py, app.py, runner.py, model.py, tests/
 - Never modify the other person's files. If a change is needed there, say so and stop.
 
 ## Interfaces (as frozen; read the files for exact names)

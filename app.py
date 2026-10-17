@@ -3,12 +3,8 @@ app.py -- the judge-facing simulator.
 
 Run:  streamlit run app.py
 
-While the real solver is being built, results come from fake.py and the app
-shows a banner saying so. To connect the real solver, change ONE line:
-    from fake import solve, IS_FAKE
-to
-    from model import solve, IS_FAKE      # IS_FAKE = False in the real module
-then delete fake.py (ground rule 7). The app always calls the solver live
+Results come from the real solver through model.py (its docstring defines
+what solve() accepts and returns). The app always calls the solver live
 (ground rule 8); results are cached only for identical inputs.
 """
 import subprocess
@@ -21,7 +17,7 @@ import streamlit as st
 
 import params as p
 import model
-from model import solve, IS_FAKE         # real solver (fake.py is no longer used)
+from model import solve
 
 # ---------------------------------------------------------------------------
 # Look and feel
@@ -45,7 +41,6 @@ html, body, [class*="css"], .stMarkdown, .stCaption, label, p, li {{
 h1, h2, h3 {{ font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; font-weight: 600; color: {INK}; }}
 h1 {{ font-size: 2.6rem; line-height: 1.05; margin-bottom: 0.2rem; }}
 .lede {{ color: {MUTED}; font-size: 1.05rem; max-width: 70ch; margin-bottom: 1.2rem; }}
-.fake {{ background: #FFF3DC; border-left: 4px solid {AMBER}; padding: 0.6rem 0.9rem; margin-bottom: 1rem; color: {INK}; }}
 .status {{ display: flex; align-items: baseline; gap: 1.2rem; padding: 0.9rem 1.1rem; margin-bottom: 0.8rem;
            border-left: 6px solid var(--c); background: white; }}
 .status .word {{ font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 2.2rem; color: var(--c); }}
@@ -132,11 +127,6 @@ st.title("Can a frit stop a runaway?")
 st.markdown('<p class="lede">One particle bed fuel element from a published nuclear rocket design, split into '
             f'{p.N_SLICES} parallel flow paths. Change the settings on the left and the solver recomputes how '
             'hydrogen divides between the paths and how hot the fuel gets.</p>', unsafe_allow_html=True)
-
-if IS_FAKE:
-    st.markdown('<div class="fake"><strong>Fake data.</strong> The solver is not connected yet. '
-                'Every number on this page comes from <code>fake.py</code> and means nothing.</div>',
-                unsafe_allow_html=True)
 
 colors = {"stable": BLUE, "runaway": RED, "out_of_range": AMBER, "no_solution": AMBER, "unknown": MUTED}
 words = {"stable": "Stable", "runaway": "Runaway", "out_of_range": "No steady solution",

@@ -39,6 +39,7 @@ pip install numpy scipy pandas CoolProp streamlit matplotlib pytest scikit-learn
 ```bash
 streamlit run app.py        # the interactive simulator
 python runner.py            # validation checks; writes results/
+python runner.py --channel-off   # fallback rule: channel-dependent checks marked not run
 pytest                      # verification tests
 python properties.py        # hydrogen property tables and checks
 python params.py            # input summary and checks
@@ -56,7 +57,12 @@ python params.py            # input summary and checks
 | `app.py` | The Streamlit app |
 | `data/` | NIST-JANAF tables for hydrogen and zirconium carbide |
 | `results/` | Validation output, one file per run |
-| [TO DO: solver files] | Slice model, steady solver, stability analysis |
+| `slice.py` | One slice: radial march through cold frit, bed, and hot frit |
+| `steady.py` | All 20 slices together: flow split, continuation rule |
+| `stability.py` | Static (Ledinegg) and eigenvalue stability tests |
+| `model.py` | Connects the solver to the app and the validation runner |
+| `docs/model.md` | The equations, written down before coding |
+| `tests/`, `tests_anthonie/` | Verification tests (`pytest` runs both) |
 
 ## Sources
 
@@ -73,4 +79,3 @@ python params.py            # input summary and checks
 - Our gas temperatures run hotter than the Tsinghua papers' because NIST data gives about 13–15% less enthalpy rise than their property model. We compare trends, not absolute temperatures.
 
 ## How we used AI
-

@@ -1,4 +1,4 @@
-"""Make the repo-root modules (slice, params, properties) importable under plain `pytest`."""
+"""Make the repo-root modules importable under plain `pytest`."""
 import sys
 from pathlib import Path
 

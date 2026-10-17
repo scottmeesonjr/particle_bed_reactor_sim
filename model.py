@@ -10,7 +10,46 @@ Provides:
   run_steady(case), find_onset(case, power_fractions, method), nominal_slice(element)
       -> the contract documented at the top of runner.py
   solve(...)
-      -> the contract documented at the top of fake.py (for app.py)
+      -> the app contract below (for app.py)
+
+APP CONTRACT -- solve() arguments and returned keys (used by app.py)
+
+    solve(power_fraction, power_shape, cold_frit_on, cold_frit_porosity,
+          use_point_a, hot_frit_pore, disturbance, disturbed_slice,
+          channel_on, n_slices=20, n_radial=20) -> dict
+
+Arguments
+  power_fraction      fraction of nominal power, 0.05-1.00
+  power_shape         "uniform" or "cosine" (params.power_shape names)
+  cold_frit_on        False removes the cold frit entirely
+  cold_frit_porosity  uniform cold frit porosity (ignored if use_point_a)
+  use_point_a         True uses the Ji et al. point A porosity profile
+  hot_frit_pore       hot frit pore size, m
+  disturbance         extra power in one slice, fraction (0-0.30)
+  disturbed_slice     index of that slice, 0-based
+  channel_on          include hot-channel and plenum pressure effects
+  n_slices, n_radial  grid
+
+Returned dict
+  "fake"              always False here
+  "status"            "stable", "runaway", "out_of_range", "no_solution", or
+                      "unknown" (steady solution found, stability not tested)
+  "status_reason"     one plain sentence explaining the status
+  "x"                 (n_slices,) slice centres along the element, m
+  "r"                 (n_radial + 1,) bed node radii, outer to inner, m, or None
+                      when radial profiles are unavailable (then gas_T, fuel_T are None)
+  "m_dot"             (n_slices,) mass flow per slice, kg/s
+  "gas_T", "fuel_T"   (n_slices, n_radial + 1) bed node temperatures, K, or None
+  "gas_outlet_T"      (n_slices,) gas temperature leaving each slice, K
+  "T_fuel_max_slice"  (n_slices,) peak fuel temperature in each slice, K
+  "peak_fuel_T"       float, K
+  "mixed_outlet_T"    float, flow-weighted outlet temperature, K
+  "dp_total"          float, Pa
+  "dp_cold_frit"      float, mean over slices, Pa
+  "dp_hot_frit"       float, mean over slices, Pa
+  "m_dot_total"       float, kg/s
+  "flags"             list of plain-language range warnings (may be empty)
+  "solve_time_s"      float, seconds
 """
 import inspect
 import time
@@ -186,7 +225,7 @@ def nominal_slice(element):
 
 
 # ---------------------------------------------------------------------------
-# app.py contract (same keys as fake.py)
+# app.py contract (see the module docstring)
 # ---------------------------------------------------------------------------
 def solve(power_fraction, power_shape, cold_frit_on, cold_frit_porosity,
           use_point_a, hot_frit_pore, disturbance, disturbed_slice,
