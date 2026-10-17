@@ -1,17 +1,76 @@
-# SwampHacks XII Game Plan: PBR Stability Simulator
-## What we're building
+# Can a Frit Stop a Runaway?
 
-We are building a website where judges can break a nuclear rocket engine and then fix it.
+A stability simulator for one fuel element of a particle bed nuclear rocket, built at SwampHacks XII.
 
-A particle bed nuclear rocket heats hydrogen by blowing it through a bed of tiny hot fuel beads. If one spot gets a little hotter, the hydrogen there gets thicker and harder to push, like syrup. Less hydrogen goes there, so it gets even hotter, until it melts. That is a runaway.
-The proposed fix is a frit: a porous wall the hydrogen must squeeze through first. It adds resistance that does not change with temperature, which weakens the runaway loop.
+Team: ATcOde
+Members: Scott Meeson, Anthonie Page
 
-Our program cuts one fuel element into 20 slices and uses real physics and real hydrogen data to compute how much hydrogen goes through each slice and how hot it gets. We check it against a published Tsinghua study (Ji et al. 2019), which found the cold-frit design stable and the hot-frit design unstable. An AI model trained on thousands of runs then predicts the answer instantly, and we show how often it is right.
+## What it does
 
-Everything we show is a model prediction, not a measurement. We say that up front.
+A particle bed nuclear rocket heats hydrogen by blowing it through a bed of tiny hot fuel particles. If one region gets a little hotter, the hydrogen there gets thicker and harder to push. Less hydrogen flows through it, so it gets hotter still, until the fuel melts. A porous wall called a cold frit adds resistance that does not change with temperature, which is meant to stop this runaway.
 
-Scott: Inputs, properties, verification tests, validation, web app, Devpost, pitch
-params.py, properties.py, validation.md, tests/, app.py, README.md
+The simulator splits one published fuel element into 20 parallel flow paths and answers three things for any settings you choose:
 
-Anthonie: Physics solver, stability analysis, sweeps, AI model
-slice.py, steady.py, stability.py, transient.py, surrogate.py
+1. **How the hydrogen splits** between the paths, so that every path has the same pressure drop and the flows add up to the total.
+2. **Whether that split is stable**: if one path loses a little flow, does it recover or run away?
+3. **Where stability is lost**, by repeating 1 and 2 across power levels and frit resistances to map the boundary.
+
+Everything it shows is a model prediction from physics equations, not a measurement.
+
+## Why the results aren't built in
+
+- Every input comes from published sources and was committed to Git before any validation run (`params.py`).
+- The pass/fail rule for every comparison with published results was committed as code before the first run (`validation.md`, `runner.py`).
+- Results that disagree with the papers are reported, not tuned away.
+- The app runs the solver live on whatever settings you pick.
+
+## Install
+
+Requires Python 3.10 or newer.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install numpy scipy pandas CoolProp streamlit matplotlib pytest scikit-learn
+```
+
+## Run
+
+```bash
+streamlit run app.py        # the interactive simulator
+python runner.py            # validation checks; writes results/
+pytest                      # verification tests
+python properties.py        # hydrogen property tables and checks
+python params.py            # input summary and checks
+```
+
+## Files
+
+| File | What it holds |
+| --- | --- |
+| `params.py` | Every input with its source, the power shapes, and the cold frit porosity profile |
+| `properties.py` | Hydrogen and fuel properties from 150 K to 5000 K |
+| `rules.py` | Rules computed in code, such as the hot-frit-dominated test element |
+| `validation.md` | Pre-registered checks, hypotheses, and decisions |
+| `runner.py` | Runs the checks and writes result files tagged with the Git commit |
+| `app.py` | The Streamlit app |
+| `data/` | NIST-JANAF tables for hydrogen and zirconium carbide |
+| `results/` | Validation output, one file per run |
+| [TO DO: solver files] | Slice model, steady solver, stability analysis |
+
+## Sources
+
+- Ji, Zhang, Sun, Shi (2019). Thermal performance optimization of a fuel element in particle bed reactors for nuclear thermal propulsion. *Nuclear Engineering and Design* 355:110316. The fuel element design and most validation targets.
+- Ji, Liu, Sun, Shi (2019). Analysis of the flow distribution in a particle bed reactor for nuclear thermal propulsion. *Energies* 12(19):3590.
+- Kerrebrock (1993). Flow instability in particle-bed nuclear reactors. NASA Lewis Research Center.
+- NIST-JANAF Thermochemical Tables (H-050, C-110); Svehla (1995), NASA TM-4647; CoolProp.
+
+## Limitations
+
+- Flow paths do not exchange flow or heat sideways, as they do in a real bed.
+- Frits are modeled as uniform resistances.
+- Hydrogen dissociation above about 3500 K is not modeled; properties stop at 5000 K.
+- Our gas temperatures run hotter than the Tsinghua papers' because NIST data gives about 13–15% less enthalpy rise than their property model. We compare trends, not absolute temperatures.
+
+## How we used AI
+
