@@ -50,3 +50,12 @@ are marked NOT RUN. V6–V9 run with channel effects off, and the app states thi
 ## Known expected disagreements (report, do not fix)
 Absolute temperatures; 1D model vs 2D CFD; parallel-passage limitation at low Reynolds number (K93);
 J19b CFD treats flow as incompressible.
+
+## Pre-run amendment A1 (committed before any validation run)
+
+These clarify how the criteria above are applied. No validation result existed when they were written.
+
+**1. V6 and the property limit (decision D13).** The sourced property data end at 5000 K (Svehla 1995 transport fits; NIST-JANAF H2 to 6000 K), and hydrogen dissociation, which the model does not include, becomes important in that range. The model therefore cannot evaluate states above 5000 K. V6's "no steady solution below 8000 K" is applied as: instability, or no steady solution with all temperatures below 5000 K. A case that leaves the property range is reported as "no steady solution within the property range." The original 8000 K wording above is kept for the record.
+**2. "No steady solution" must survive the continuation rule.** A solve counts as "no steady solution" only after the continuation rule in docs/model.md section 3a is exhausted. A failure at a single solver trial point is not a result.
+**3. Sweep step.** Sweeps use the 2.5% step defined above. runner.py previously used 2%; that mismatch was fixed before any run.
+**4. Static vs. eigenvalue onsets (V7, V9).** The static onset is the highest swept power at which any slice has d(Δp_slice)/d(m) < 0 (Ledinegg) or the residual Jacobian determinant has changed sign since the first converged sweep point. The eigenvalue onset is the highest swept power with an eigenvalue of positive real part. Points without a converged solution are listed separately and are not counted as unstable.
