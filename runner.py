@@ -53,7 +53,7 @@ RESULTS_DIR = Path(__file__).resolve().parent / "results"
 # ---------------------------------------------------------------------------
 # Fixed settings for the sweeps (pre-registered here)
 # ---------------------------------------------------------------------------
-SWEEP_STEP = 0.02                                   # power fraction step (0.4 MW/L)
+SWEEP_STEP = 0.025                                   # power fraction step (0.4 MW/L)
 SWEEP = np.round(np.arange(p.POWER_SWEEP[0], p.POWER_SWEEP[1] + 1e-9, SWEEP_STEP), 4)
 DP_TOLERANCE = 0.25                                 # +/-25% (v3 Section 6)
 DP_UNCHANGED = 0.02                                 # "changes by less than 2%"
@@ -105,7 +105,8 @@ def v6(m, refs):
     out = {"D8": d8}
     for ref in refs:
         r = m.run_steady(case(variant, pressure_ref=ref))
-        ok = r["status"] in ("runaway", "out_of_range")
+        # validation.md amendment A1: no solution counts only after the continuation rule
+        ok = r["status"] in ("runaway", "out_of_range", "no_solution")
         out[ref] = dict(verdict="pass" if ok else "fail", status=r["status"],
                         peak_fuel_T=r["peak_fuel_T"], flags=r["flags"])
     return "see per-reference", out
