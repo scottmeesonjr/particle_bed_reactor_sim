@@ -27,14 +27,17 @@ Arguments
 
 Returned dict
   "fake"            True here; the real solver returns False
-  "status"          "stable", "runaway", or "out_of_range"
+  "status"          "stable", "runaway", "out_of_range", "no_solution", or
+                    "unknown" (steady solution found, stability not tested)
   "status_reason"   one plain sentence explaining the status
   "x"               (n_slices,) slice centers along the element, m
-  "r"               (n_radial,) radial positions across the bed, outer to inner, m
+  "r"               (n_radial,) radial positions across the bed, outer to inner, m,
+                    or None if radial profiles are unavailable (then gas_T and fuel_T are None)
   "m_dot"           (n_slices,) mass flow per slice, kg/s
   "gas_T"           (n_slices, n_radial) gas temperature, K
   "fuel_T"          (n_slices, n_radial) fuel temperature, K
   "gas_outlet_T"    (n_slices,) gas temperature leaving each slice, K
+  "T_fuel_max_slice" (n_slices,) peak fuel temperature in each slice, K
   "peak_fuel_T"     float, K
   "mixed_outlet_T"  float, flow-weighted outlet temperature, K
   "dp_total"        float, Pa
@@ -110,7 +113,7 @@ def solve(power_fraction, power_shape, cold_frit_on, cold_frit_porosity,
     return {
         "fake": True, "status": status, "status_reason": reason,
         "x": x, "r": r, "m_dot": m_dot, "gas_T": gas_T, "fuel_T": fuel_T,
-        "gas_outlet_T": gas_out, "peak_fuel_T": peak, "mixed_outlet_T": mixed,
+        "gas_outlet_T": gas_out, "T_fuel_max_slice": fuel_T.max(axis=1), "peak_fuel_T": peak, "mixed_outlet_T": mixed,
         "dp_total": dp_total, "dp_cold_frit": dp_cold, "dp_hot_frit": dp_hot,
         "m_dot_total": m_total, "flags": flags,
         "solve_time_s": time.perf_counter() - t0,

@@ -20,7 +20,8 @@ from matplotlib.colors import LinearSegmentedColormap
 import streamlit as st
 
 import params as p
-from fake import solve, IS_FAKE          # <- swap to the real solver here
+import model
+from model import solve, IS_FAKE         # real solver (fake.py is no longer used)
 
 # ---------------------------------------------------------------------------
 # Look and feel
@@ -101,8 +102,12 @@ with st.sidebar:
     disturbed = st.slider("Disturbed slice", 1, p.N_SLICES, p.N_SLICES // 2, disabled=disturbance_pct == 0)
 
     st.header("Model")
-    channel_on = st.toggle("Include hot-channel and plenum pressure", value=True,
+    channel_ready = getattr(model, "CHANNEL_AVAILABLE", True)
+    channel_on = st.toggle("Include hot-channel and plenum pressure", value=channel_ready,
+                           disabled=not channel_ready,
                            help="Turn off to see the element with uniform plenum and channel pressure.")
+    if not channel_ready:
+        st.caption("The channel and plenum model isn't built yet. Every slice sees the same pressure drop.")
 
 
 @st.cache_data(show_spinner="Solving…")
@@ -112,8 +117,13 @@ def run(power_fraction, power_shape, cold_on, cold_eps, use_a, hot_pore, dist, d
                  disturbance=dist, disturbed_slice=dist_slice, channel_on=channel_on)
 
 
-res = run(power_pct / 100, power_shape, cold_on, cold_eps, use_a and cold_on,
-          hot_pore_um * 1e-6, disturbance_pct / 100, disturbed - 1, channel_on)
+try:
+    res = run(power_pct / 100, power_shape, cold_on, cold_eps, use_a and cold_on,
+              hot_pore_um * 1e-6, disturbance_pct / 100, disturbed - 1, channel_on)
+except NotImplementedError as e:
+    st.title("Can a frit stop a runaway?")
+    st.error(f"This setting isn't supported yet. {e}")
+    st.stop()
 
 # ---------------------------------------------------------------------------
 # Header and status
@@ -128,11 +138,16 @@ if IS_FAKE:
                 'Every number on this page comes from <code>fake.py</code> and means nothing.</div>',
                 unsafe_allow_html=True)
 
-colors = {"stable": BLUE, "runaway": RED, "out_of_range": AMBER}
-words = {"stable": "Stable", "runaway": "Runaway", "out_of_range": "No steady solution"}
+colors = {"stable": BLUE, "runaway": RED, "out_of_range": AMBER, "no_solution": AMBER, "unknown": MUTED}
+words = {"stable": "Stable", "runaway": "Runaway", "out_of_range": "No steady solution",
+         "no_solution": "No steady solution", "unknown": "Steady state found"}
 st.markdown(f'<div class="status" style="--c:{colors[res["status"]]}"><span class="word">'
             f'{words[res["status"]]}</span><span class="why">{res["status_reason"]}</span></div>',
             unsafe_allow_html=True)
+
+
+def fmt(v, pattern):
+    return pattern.format(v) if np.isfinite(v) else "n/a"
 
 
 def metric(col, value, label, over=False):
@@ -141,11 +156,11 @@ def metric(col, value, label, over=False):
 
 
 c1, c2, c3, c4 = st.columns(4)
-metric(c1, f'{res["peak_fuel_T"]:,.0f} K', f"Peak fuel temperature (limit {p.T_LIMIT:,.0f} K)",
+metric(c1, fmt(res["peak_fuel_T"], "{:,.0f} K"), f"Peak fuel temperature (limit {p.T_LIMIT:,.0f} K)",
        over=res["peak_fuel_T"] > p.T_LIMIT)
-metric(c2, f'{res["dp_total"]/1e3:,.0f} kPa', f"Pressure drop (limit {p.DP_LIMIT/1e3:,.0f} kPa)",
+metric(c2, fmt(res["dp_total"] / 1e3, "{:,.0f} kPa"), f"Pressure drop (limit {p.DP_LIMIT/1e3:,.0f} kPa)",
        over=res["dp_total"] > p.DP_LIMIT)
-metric(c3, f'{res["mixed_outlet_T"]:,.0f} K', "Mixed outlet gas temperature")
+metric(c3, fmt(res["mixed_outlet_T"], "{:,.0f} K"), "Mixed outlet gas temperature")
 metric(c4, f'{res["m_dot_total"]:.3f} kg/s', "Hydrogen flow")
 
 for flag in res["flags"]:
@@ -159,21 +174,26 @@ tab_live, tab_map, tab_val, tab_model, tab_q = st.tabs(
 
 with tab_live:
     # Bed temperature map (the paper's Fig. 8 view): axial along x, radial down the page
-    fig, ax = plt.subplots(figsize=(11, 2.8))
-    extent = [0, p.L_ELEMENT, p.R_BED_IN * 1e3, p.R_BED_OUT * 1e3]
-    im = ax.imshow(res["fuel_T"].T, aspect="auto", origin="upper", extent=extent,
-                   cmap=BED_CMAP, vmin=T_SCALE[0], vmax=T_SCALE[1], interpolation="bilinear")
-    if res["fuel_T"].max() > p.T_LIMIT:
-        X, R = np.meshgrid(res["x"], res["r"] * 1e3, indexing="ij")
-        ax.contour(X, R, res["fuel_T"], levels=[p.T_LIMIT], colors=[RED], linewidths=1.5)
-    ax.set_xlabel("Position along the element, m")
-    ax.set_ylabel("Radius, mm")
-    ax.set_title("Fuel temperature in the bed. Hydrogen enters at the top (cold frit) and leaves at the "
-                 "bottom (hot frit).", loc="left", fontsize=10, color=MUTED)
-    cb = fig.colorbar(im, ax=ax, pad=0.01)
-    cb.set_label("K")
-    st.pyplot(fig)
-    plt.close(fig)
+    if res["fuel_T"] is None:
+        st.info("The bed temperature map needs radial profiles from slice.py (docs/model.md section 1a). "
+                "The per-slice results are below.")
+    else:
+        fig, ax = plt.subplots(figsize=(11, 2.8))
+        extent = [0, p.L_ELEMENT, p.R_BED_IN * 1e3, p.R_BED_OUT * 1e3]
+        im = ax.imshow(res["fuel_T"].T, aspect="auto", origin="upper", extent=extent,
+                       cmap=BED_CMAP, vmin=T_SCALE[0], vmax=T_SCALE[1], interpolation="bilinear")
+        if res["fuel_T"].max() > p.T_LIMIT:
+            X, R = np.meshgrid(res["x"], res["r"] * 1e3, indexing="ij")
+            ax.contour(X, R, res["fuel_T"], levels=[p.T_LIMIT], colors=[RED], linewidths=1.5)
+        ax.set_xlabel("Position along the element, m")
+        ax.set_ylabel("Radius, mm")
+        ax.set_title("Fuel temperature in the bed. Hydrogen enters at the top (cold frit) and leaves at the "
+                     "bottom (hot frit).", loc="left", fontsize=10, color=MUTED)
+        cb = fig.colorbar(im, ax=ax, pad=0.01)
+        cb.set_label("K")
+        st.pyplot(fig)
+        plt.close(fig)
+
 
     left, right = st.columns(2)
     slice_no = np.arange(1, len(res["m_dot"]) + 1)
@@ -193,7 +213,7 @@ with tab_live:
 
     with right:
         fig, ax = plt.subplots(figsize=(5.5, 3.2))
-        ax.plot(slice_no, res["fuel_T"].max(axis=1), color=INK, lw=2, label="Peak fuel")
+        ax.plot(slice_no, res["T_fuel_max_slice"], color=INK, lw=2, label="Peak fuel")
         ax.plot(slice_no, res["gas_outlet_T"], color=BLUE, lw=2, label="Gas leaving slice")
         for T in p.APP_WARNING_TEMPS_K[:-1]:
             ax.axhline(T, color=AMBER, lw=0.8, ls=":")

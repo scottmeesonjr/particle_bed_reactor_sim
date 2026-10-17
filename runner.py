@@ -16,7 +16,7 @@ SOLVER CONTRACT -- the teammate's code must provide a module `model` with:
 
   run_steady(case) -> dict
       Steady solution for one case. Must return:
-        "status"      "stable", "runaway", or "out_of_range"
+        "status"      "stable", "runaway", "out_of_range", or "no_solution"
         "dp_total"    total element pressure drop, Pa
         "peak_fuel_T" K
         "flags"       list of correlation-range warnings
@@ -53,7 +53,7 @@ RESULTS_DIR = Path(__file__).resolve().parent / "results"
 # ---------------------------------------------------------------------------
 # Fixed settings for the sweeps (pre-registered here)
 # ---------------------------------------------------------------------------
-SWEEP_STEP = 0.025                                   # power fraction step (0.4 MW/L)
+SWEEP_STEP = 0.025                                  # power fraction step (validation.md: 2.5%)
 SWEEP = np.round(np.arange(p.POWER_SWEEP[0], p.POWER_SWEEP[1] + 1e-9, SWEEP_STEP), 4)
 DP_TOLERANCE = 0.25                                 # +/-25% (v3 Section 6)
 DP_UNCHANGED = 0.02                                 # "changes by less than 2%"
