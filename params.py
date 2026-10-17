@@ -206,7 +206,7 @@ RE_MIN_KTA_HT = 100.0        # KTA heat transfer lower limit (v2 audit, D4)
 POWER_SWEEP = (0.05, 1.00)            # fraction of nominal = 1-20 MW/L
 OPERATIONAL_RANGE = (0.20, 1.00)      # 20% power = 4 MW/L
 Q1_POWER_DENSITY_RANGE = (1.0e9, 30.0e9)   # W/m^3 = 1-30 MW/L, both elements (Q1)
-NASA_THRESHOLD_MW_PER_L = 4.0         # [K93] -- confirm in the PDF before freezing
+NASA_THRESHOLD_MW_PER_L = 4.0         # [K93] confirmed, Kerrebrock pp. 498
 
 # ============================================================================
 # 8. VALIDATION ELEMENTS -- [T19] (validation runs only)
