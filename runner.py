@@ -190,9 +190,89 @@ def v12(m, refs):
         dp_base_kPa=base["dp_total"] / 1e3, dp_A_kPa=a["dp_total"] / 1e3)
 
 
-CHECKS = {"V5": v5, "V6": v6, "V7": v7, "V8": v8, "V9": v9, "V10": v10, "V11": v11, "V12": v12}
-# Tier 2 (V1-V4) and Tier 3 (V13) checks get added here, and committed,
-# before they are first run.
+# ---------------------------------------------------------------------------
+# Tier 2: the Tsinghua large reactor (Energies 2019, Examples A-C), validation.md A2
+# Every case runs at both pressure references (8.0 MPa at the outlet, and at the inlet).
+# A case with no steady solution inside the property range makes its check
+# "not evaluable": reported, never counted as a pass (validation.md A2, item 1).
+# ---------------------------------------------------------------------------
+def _large(m, L=1.2, variant="baseline", pattern="Z", ref="outlet"):
+    import elements
+    el = elements.large_reactor(L, variant)
+    return m.run_steady(case(el, m_dot=el["m_dot"], pattern=pattern, pressure_ref=ref))
+
+
+def _evaluable(*results):
+    return all(r["status"] in ("stable", "runaway") for r in results)
+
+
+def _per_ref(refs, fn):
+    out = {}
+    for ref in refs:
+        verdict, d = fn(ref)
+        out[ref] = dict(verdict=verdict, **d)
+    return "see per-reference", out
+
+
+def _ne(*results):
+    return "not evaluable", dict(note="no steady solution inside the property range",
+                                 statuses=[r["status"] for r in results])
+
+
+def v1(m, refs):
+    def one(ref):
+        r = _large(m, ref=ref)
+        if not _evaluable(r):
+            return _ne(r)
+        return ("pass" if within(r["dp_total"], 872.4e3, DP_TOLERANCE) else "fail"), dict(
+            dp_kPa=r["dp_total"] / 1e3, peak_fuel_T=r["peak_fuel_T"], status=r["status"], flags=r["flags"])
+    return _per_ref(refs, one)
+
+
+def v2(m, refs):
+    def one(ref):
+        z, u = _large(m, pattern="Z", ref=ref), _large(m, pattern="U", ref=ref)
+        if not _evaluable(z, u):
+            return _ne(z, u)
+        ok = u["peak_fuel_T"] < z["peak_fuel_T"] and within(u["dp_total"], z["dp_total"], DP_UNCHANGED)
+        return ("pass" if ok else "fail"), dict(peak_Z_K=z["peak_fuel_T"], peak_U_K=u["peak_fuel_T"],
+                                                 dp_Z_kPa=z["dp_total"] / 1e3, dp_U_kPa=u["dp_total"] / 1e3)
+    return _per_ref(refs, one)
+
+
+V3_TARGETS = {0.8: 551.8e3, 1.0: 693.0e3, 1.2: 865.7e3}       # Energies Table 4
+
+
+def v3(m, refs):
+    def one(ref):
+        rs = {L: _large(m, L=L, ref=ref) for L in V3_TARGETS}
+        if not _evaluable(*rs.values()):
+            return _ne(*rs.values())
+        dp_ok = all(within(rs[L]["dp_total"], t, DP_TOLERANCE) for L, t in V3_TARGETS.items())
+        beta_ok = rs[0.8]["beta"] < rs[1.0]["beta"] < rs[1.2]["beta"]
+        return ("pass" if dp_ok and beta_ok else "fail"), dict(
+            dp_kPa={L: rs[L]["dp_total"] / 1e3 for L in rs}, beta={L: rs[L]["beta"] for L in rs},
+            dp_within_25pct=dp_ok, beta_decreases_with_shorter_core=beta_ok)
+    return _per_ref(refs, one)
+
+
+def v4(m, refs):
+    def one(ref):
+        b = _large(m, variant="baseline", ref=ref)
+        c = _large(m, variant="cold_dominated", ref=ref)
+        h = _large(m, variant="hot_dominated", ref=ref)
+        if not _evaluable(b, c, h):
+            return _ne(b, c, h)
+        ok = c["peak_fuel_T"] < b["peak_fuel_T"] and h["peak_fuel_T"] < b["peak_fuel_T"]
+        return ("pass" if ok else "fail"), dict(peak_baseline_K=b["peak_fuel_T"],
+                                                 peak_cold_dominated_K=c["peak_fuel_T"],
+                                                 peak_hot_dominated_K=h["peak_fuel_T"])
+    return _per_ref(refs, one)
+
+
+CHECKS = {"V5": v5, "V6": v6, "V7": v7, "V8": v8, "V9": v9, "V10": v10, "V11": v11, "V12": v12,
+          "V1": v1, "V2": v2, "V3": v3, "V4": v4}
+# Tier 3 (V13) gets added here, and committed, before it is first run.
 
 
 # ---------------------------------------------------------------------------
@@ -268,7 +348,8 @@ class _StandIn:
             dp, peak = 420e3, peak - 400.0
         hot_dominated = c["element"].get("cold_frit_pore", 0) > 5e-6
         return dict(status="runaway" if hot_dominated else "stable",
-                    dp_total=dp, peak_fuel_T=peak, flags=[])
+                    dp_total=dp, peak_fuel_T=peak, flags=[], beta=1.0, flow_cov=0.0,
+                    flow_max_over_min=1.0)
 
     def find_onset(self, c, fractions, method):
         bad = [f for f in fractions if c["cold_frit"] == "none" and f <= 0.21]

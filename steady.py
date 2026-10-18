@@ -90,10 +90,11 @@ def _slice_frits(el, cold_profile, hot, N):
     return s, colds, hot
 
 
-def manifold_setup(el, N, channel, pressure_ref):
+def manifold_setup(el, N, channel, pressure_ref, pattern="Z"):
     """Pure-data description of the plenum and channel (picklable)."""
     return dict(
         N=N, dz=el["L"] / N, T_in=el["T_in"], channel=bool(channel), pressure_ref=pressure_ref,
+        pattern=pattern,
         p_ref=el["p_ref"],
         A_ch=math.pi * el["r_ch"] ** 2, Dh_ch=2.0 * el["r_ch"],
         A_pl=math.pi * (el["r_el"] ** 2 - el["r_cf"] ** 2), Dh_pl=2.0 * (el["r_el"] - el["r_cf"]),
@@ -117,12 +118,21 @@ def _friction_dp(W, rho, mu, A, Dh, length):
 
 
 def plenum_pressures(m, p0, st, friction=True):
-    """Plenum pressure at each slice centre. Fed at z = 0 with sum(m); flow at a slice
-    centre is taken halfway through that slice's draw (A2)."""
+    """Plenum pressure at each slice centre. Z pattern: fed at z = 0 and flowing up.
+    U pattern (A3): fed at z = L and flowing down, the same march in reverse slice order.
+    p0 is the pressure where the plenum is fed. Flow at a slice centre is taken halfway
+    through that slice's draw (A2)."""
     m = np.asarray(m, dtype=float)
     N = len(m)
     if not st["channel"]:
         return np.full(N, float(p0))
+    if st.get("pattern", "Z") == "U":
+        return _plenum_march(m[::-1], p0, st, friction)[::-1]
+    return _plenum_march(m, p0, st, friction)
+
+
+def _plenum_march(m, p0, st, friction):
+    N = len(m)
     A, Dh, dz, T = st["A_pl"], st["Dh_pl"], st["dz"], st["T_in"]
     mu = float(pr.mu(T))
     W_tot = float(m.sum())
@@ -337,8 +347,6 @@ def solve_element(power_frac, m_total, geom=None, power_shape="uniform", cold_pr
         raise ValueError(f'pressure_ref must be "outlet" or "inlet" (got {pressure_ref!r})')
     if pattern not in ("Z", "U"):
         raise ValueError(f'pattern must be "Z" or "U" (got {pattern!r})')
-    if channel and pattern == "U":
-        raise NotImplementedError("The U pattern is Tier 2 and not built (docs/model.md A2)")
 
     t0 = time.perf_counter()
     el = _element(geom)
@@ -347,7 +355,7 @@ def solve_element(power_frac, m_total, geom=None, power_shape="uniform", cold_pr
     if mult.shape != (N,):
         raise ValueError(f"power_multipliers must have length N = {N}")
     s, colds, hot = _slice_frits(el, cold_profile, hot, N)
-    st = manifold_setup(el, N, channel, pressure_ref)
+    st = manifold_setup(el, N, channel, pressure_ref, pattern)
     inputs = dict(power_frac=power_frac, m_total=m_total, power_shape=power_shape,
                   cold_profile=cold_profile, hot=hot, N=N, n_r=n_r, channel=channel,
                   pattern=pattern, pressure_ref=pressure_ref,

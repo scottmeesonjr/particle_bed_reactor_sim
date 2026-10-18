@@ -103,6 +103,31 @@ def test_eigen_matches_brute_force_channel_on():
     assert stb.eigen_check(r)["max_real"] == pytest.approx(np.linalg.eigvals(J).real.max(), rel=1e-4)
 
 
-def test_u_pattern_not_built():
-    with pytest.raises(NotImplementedError):
-        S.solve_element(PF, M, channel=True, pattern="U")
+@pytest.fixture(scope="module")
+def res_u():
+    r = S.solve_element(PF, M, power_shape="cosine", channel=True, pattern="U")
+    assert r["converged"]
+    return r
+
+
+def test_u_pattern_satisfies_equations(res_u):
+    st = res_u["slice_inputs"]["setup"]
+    assert np.max(np.abs(res_u["p_plenum"] - res_u["p_channel"] - res_u["dp"])) < 1.0
+    assert res_u["m"].sum() == pytest.approx(M, rel=1e-8)
+    absorbed = np.sum(res_u["m"] * (pr.h(res_u["T_gas_out"]) - pr.h(st["T_in"])))
+    assert absorbed == pytest.approx(res_u["q"].sum(), rel=1e-6)
+
+
+def test_u_plenum_is_fed_from_the_top(res_u):
+    # Friction off: momentum telescopes from the feed at z = L down to the bottom slice.
+    st = res_u["slice_inputs"]["setup"]; m = res_u["m"]; p0 = res_u["p_in"]
+    ppl = S.plenum_pressures(m, p0, st, friction=False)
+    rho_last = float(pr.rho(st["T_in"], ppl[1]))
+    pred = p0 - ((0.5 * m[0]) ** 2 / rho_last - m.sum() ** 2 / float(pr.rho(st["T_in"], p0))) / st["A_pl"] ** 2
+    assert ppl[0] == pytest.approx(pred, rel=1e-12)
+
+
+def test_u_equals_z_with_channel_off():
+    z = S.solve_element(PF, M, power_shape="cosine", channel=False, pattern="Z")
+    u = S.solve_element(PF, M, power_shape="cosine", channel=False, pattern="U")
+    assert np.allclose(z["m"], u["m"], rtol=1e-12)

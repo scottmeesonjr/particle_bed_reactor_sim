@@ -124,7 +124,8 @@ def _solve_case(case, power_frac=1.0, x0=None):
     return steady.solve_element(
         power_frac, _mass_flow(case, power_frac), geom=_geom(case["element"]),
         power_shape=case["power_shape"], cold_profile=_cold_profile(case["cold_frit"]),
-        channel=case["channel_on"], pressure_ref=case["pressure_ref"], x0=x0)
+        channel=case["channel_on"], pressure_ref=case["pressure_ref"],
+        pattern=case.get("pattern", "Z"), x0=x0)
 
 
 def _flag_list(res):
@@ -161,7 +162,10 @@ def run_steady(case):
     unstable = st["ledinegg"] or st["max_real"] > 0.0
     return dict(status="runaway" if unstable else "stable", dp_total=float(res["dp_element"]),
                 peak_fuel_T=float(np.nanmax(res["T_fuel_max"])), flags=_flag_list(res),
-                stability=st)
+                stability=st,
+                beta=float(np.max(res["dp_bed"]) / np.min(res["dp_bed"])),       # A3: Energies Eq. 11
+                flow_cov=float(np.std(res["m"]) / np.mean(res["m"])),
+                flow_max_over_min=float(np.max(res["m"]) / np.min(res["m"])))
 
 
 def find_onset(case, power_fractions, method):
