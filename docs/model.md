@@ -272,3 +272,14 @@ was run. No Q3 or Q5 result existed when they were written.
   "not answerable" rather than "yes".
 - The trained models are saved with the results (joblib) so the app can show the surrogate's
   prediction beside a live solve. The app never retrains.
+
+## Amendment A5 (Tier 2 observations; written AFTER the V1-V4 run at d598bdb)
+Unlike A1-A4, this was written after a result existed: V1-V4 were all "not evaluable", and
+the run recorded only the statuses of the cases inside them. It adds no verdict and changes
+none; V1-V4 stay "not evaluable" and are never counted.
+- observations.py re-solves exactly the V3 and V4 cases (runner._large, both pressure
+  references) and records, for every case that converged: element pressure drop, beta,
+  peak fuel temperature, flow coefficient of variation, and stability status.
+- V3 cases are shown beside the published pressure drops (Energies Table 4) as a plain
+  percent difference. No tolerance or pass rule is applied to any observation.
+- Output is labeled "observations, not counted" wherever it appears (results file and app).
