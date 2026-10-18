@@ -40,6 +40,8 @@ pip install numpy scipy pandas CoolProp streamlit matplotlib pytest scikit-learn
 streamlit run app.py        # the interactive simulator
 python runner.py            # validation checks; writes results/
 python runner.py --channel-off   # fallback rule: channel-dependent checks marked not run
+python questions.py q3      # Q3: flow shift, Z vs U; then python question_report.py
+python surrogate.py         # Q5: train and test the surrogate (uses every CPU core)
 pytest                      # verification tests
 python properties.py        # hydrogen property tables and checks
 python params.py            # input summary and checks
@@ -61,6 +63,8 @@ python params.py            # input summary and checks
 | `steady.py` | All 20 slices together: flow split, continuation rule |
 | `stability.py` | Static (Ledinegg) and eigenvalue stability tests |
 | `model.py` | Connects the solver to the app and the validation runner |
+| `questions.py`, `question_report.py` | Research questions Q1–Q4 and their reports |
+| `surrogate.py` | Q5: solver training data, the trained surrogate, and its scorecard |
 | `docs/model.md` | The equations, written down before coding |
 | `tests/`, `tests_anthonie/` | Verification tests (`pytest` runs both) |
 

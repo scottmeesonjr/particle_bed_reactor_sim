@@ -232,8 +232,9 @@ for flag in res["flags"]:
 # ---------------------------------------------------------------------------
 # Tabs
 # ---------------------------------------------------------------------------
-tab_live, tab_map, tab_run, tab_val, tab_model, tab_q = st.tabs(
-    ["Fuel element", "Stability map", "Runaway", "Validation", "What's in the model", "Open questions"])
+tab_live, tab_map, tab_run, tab_ai, tab_val, tab_model, tab_q = st.tabs(
+    ["Fuel element", "Stability map", "Runaway", "AI vs physics", "Validation", "What's in the model",
+     "Open questions"])
 
 with tab_live:
     # Bed temperature map (the paper's Fig. 8 view): axial along x, radial down the page
@@ -332,6 +333,77 @@ with tab_run:
                    "Its growth and decay rates match the eigenvalue stability test, which is its "
                    "linearization. " + provenance(tr))
 
+with tab_ai:
+    st.subheader("Can a trained model stand in for the solver?")
+    q5 = latest_question("q5")
+    import surrogate
+    models = surrogate.load_latest()
+    if q5 is None or models is None:
+        st.info("No trained surrogate yet. Run `python3 surrogate.py`.")
+    else:
+        st.write("Ji et al. list replacing their slow simulation with a fast surrogate model as future work. "
+                 "We trained one on our own solver: it saw thousands of solver runs and learned to predict "
+                 "two things, whether the element is stable and how hot the fuel gets. Pick a design below. "
+                 "Both answer it now: the physics solver from the equations, the surrogate from what it learned.")
+        c1, c2, c3, c4 = st.columns(4)
+        ai_power = c1.slider("Power, % of nominal", 20, 100, 100, step=5, key="ai_power")
+        ai_cold = c2.select_slider("Cold frit pore, µm", options=[1.5, 1.75, 2.0, 2.25, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0],
+                                   value=2.0, key="ai_cold",
+                                   help="Smaller pores mean more resistance. Published design: 2 µm. "
+                                        "The surrogate was trained on 1.5–4 µm.")
+        ai_hot = c3.select_slider("Hot frit pore, µm", options=[30, 50, 75, 100, 150, 200, 300],
+                                  value=100, key="ai_hot", help="Published design: 100 µm.")
+        ai_shape = c4.radio("Axial power", ["Uniform", "Cosine"], key="ai_shape", horizontal=True).lower()
+
+        pred = surrogate.predict(models, ai_power / 100, ai_cold * 1e-6, ai_hot * 1e-6, ai_shape)
+
+        @st.cache_data(show_spinner="Solving with the physics model…")
+        def physics_case(f, cold, hot, shape):
+            return surrogate.run_case(dict(k=-1, power_frac=f, cold_pore=cold, hot_pore=hot, power_shape=shape))
+
+        phys = physics_case(ai_power / 100, ai_cold * 1e-6, ai_hot * 1e-6, ai_shape)
+        phys_ok = phys["status"] == "stable"
+        phys_word = {"stable": "Stable", "unstable": "Runaway", "out_of_range": "No steady state",
+                     "no_solution": "No steady state", "error": "Solver error"}[phys["status"]]
+
+        left, right = st.columns(2)
+        for col, title, word, ok, peak, secs, note in (
+                (left, "Physics solver", phys_word, phys_ok, phys.get("peak_fuel_T"), phys["seconds"],
+                 "Solves the flow split and both stability tests from the equations."),
+                (right, "Trained surrogate", "Stable" if pred["ok"] else "Not OK", pred["ok"], pred["peak_fuel_T"],
+                 pred["seconds"], f"{pred['p_ok'] * 100:.0f}% confident it is stable.")):
+            color = BLUE if ok else RED
+            with col:
+                st.markdown(f'<div class="status" style="--c:{color}"><span class="word">{word}</span>'
+                            f'<span class="why">{title}. {note}</span></div>', unsafe_allow_html=True)
+                m1, m2 = st.columns(2)
+                metric(m1, fmt(peak, "{:,.0f} K") if peak is not None else "n/a", "Peak fuel temperature",
+                       over=peak is not None and peak > p.T_LIMIT)
+                metric(m2, f"{secs * 1e3:,.1f} ms" if secs >= 1e-3 else f"{secs * 1e6:,.0f} µs", "Time to answer")
+
+        agree = phys_ok == pred["ok"]
+        if phys["status"] == "error":
+            st.warning("The solver raised an error at this setting, so there is nothing to compare against.")
+        else:
+            gap = (f" Peak temperatures differ by {abs(pred['peak_fuel_T'] - phys['peak_fuel_T']):,.0f} K."
+                   if phys.get("peak_fuel_T") is not None else "")
+            (st.success if agree else st.error)(
+                ("They agree on stability." if agree else "They disagree on stability.") + gap)
+        if not surrogate.in_training_range(models, ai_power / 100, ai_cold * 1e-6, ai_hot * 1e-6):
+            st.warning("This design is outside the range the surrogate was trained on (cold frit pore 1.5–4 µm). "
+                       "Its answer here is an extrapolation; the scorecard below shows how well that goes.")
+
+        st.markdown("**Scorecard on cases it never saw** (rule fixed before training: balanced accuracy at least "
+                    "0.95 and peak-temperature error at most 50 K)")
+        st.markdown(md_section(q5["md"], "Answer"))
+        if q5["png"]:
+            st.image(q5["png"])
+        with st.expander("Training data and details"):
+            st.markdown(md_section(q5["md"], "Data"))
+            st.markdown(md_section(q5["md"], "Held-out details"))
+            st.markdown(md_section(q5["md"], "Limits"))
+        st.caption("The surrogate never retrains in the app; it is the model saved with the results. " + provenance(q5))
+
 with tab_val:
     st.subheader("Checks against published results")
     st.write("Every check and its pass rule were written down and committed before the first run. "
@@ -412,7 +484,16 @@ with tab_q:
         st.caption("Not run yet.")
 
     st.markdown("**Q3.** How large is the flow shift along the element, and does a U flow pattern reduce it?")
-    st.caption("Tier 2. Not run yet.")
+    q3 = latest_question("q3")
+    if q3 and q3["md"]:
+        st.markdown(md_section(q3["md"], "Answer"))
+        if q3["png"]:
+            st.image(q3["png"])
+        with st.expander("Every case"):
+            st.markdown(md_section(q3["md"], "Per case"))
+        st.caption(provenance(q3))
+    else:
+        st.caption("Not run yet.")
 
     st.markdown("**Q4.** Does Ji et al.'s optimized point A stay stable across the 20–100% throttle range? "
                 "We made no prediction.")
@@ -427,7 +508,12 @@ with tab_q:
         st.caption("Not run yet.")
 
     st.markdown("**Q5.** Can a fast trained model stand in for the solver?")
-    st.caption("Tier 2. Not run yet.")
+    q5 = latest_question("q5")
+    if q5 and q5["md"]:
+        st.markdown(md_section(q5["md"], "Answer"))
+        st.caption("Try it on the AI vs physics tab. " + provenance(q5))
+    else:
+        st.caption("Not run yet.")
 
 st.caption(f'Solve time {res["solve_time_s"]*1e3:.0f} ms. Parameters {p.PARAMS_VERSION}. '
            f'Code version {git_hash()}.')

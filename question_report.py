@@ -1,5 +1,5 @@
 """
-question_report.py -- turns saved Q2 / Q4 results into a markdown summary and a plot.
+question_report.py -- turns saved Q1-Q4 results into a markdown summary and a plot.
 Reads results/q2_*.json and results/q4_*.json (newest of each). Never recomputes.
 
     python question_report.py
@@ -263,6 +263,62 @@ def q1_report(path):
     return png
 
 
+def _fmt(v, f):
+    return format(v, f) if isinstance(v, (int, float)) else "n/a"
+
+
+def q3_report(path):
+    d = json.loads(path.read_text())
+    els = d["elements"]
+    fig, axes = plt.subplots(1, len(els), figsize=(6 * len(els), 3.8), squeeze=False)
+    styles = {"off": (MUTED, "Channel off (no shift)"), "Z": (RED, "Z pattern"), "U": (BLUE, "U pattern")}
+    for ax, e in zip(axes[0], els):
+        drawn = False
+        for label, (color, text) in styles.items():
+            c = e["cases"][label]
+            if "m" in c:
+                m = c["m"]
+                ax.plot(range(1, len(m) + 1), [v / (sum(m) / len(m)) for v in m], color=color, lw=2,
+                        marker="o", ms=3, label=f"{text}, CoV {c['flow_cov']:.3f}")
+                drawn = True
+        if not drawn:
+            ax.text(0.5, 0.5, "No steady solution inside the\n5000 K property range for Z or U",
+                    ha="center", va="center", color=AMBER, transform=ax.transAxes)
+        ax.axhline(1.0, color=MUTED, lw=0.8, ls=":")
+        ax.set_title(e["name"], loc="left", fontsize=11, color=INK)
+        ax.set_xlabel("Slice (inlet end to outlet end)")
+        ax.set_ylabel("Slice flow / mean slice flow")
+        if drawn:
+            ax.legend(frameon=False, fontsize=9)
+    fig.text(0.01, 0.01, "100% power, uniform axial power, outlet-referenced. Missing lines: no steady solution.",
+             color=MUTED, fontsize=9)
+    fig.tight_layout(rect=(0, 0.05, 1, 1))
+    png = path.with_suffix(".png"); fig.savefig(png, dpi=130); plt.close(fig)
+
+    lines = ["# Q3: How large is the flow shift, and does a U pattern reduce it?", "",
+             f"Commit {d['commit']}{' (uncommitted changes present)' if d.get('uncommitted_changes') else ''}. "
+             "Procedure: docs/model.md A3 and A4. Flow shift = coefficient of variation (CoV) of the slice "
+             "flows with the Z pattern; H7 (validation.md) holds if U's CoV is lower than Z's.", "",
+             "## Answer"]
+    for e in els:
+        h = e["h7"]
+        if h["verdict"] == "not answerable":
+            lines.append(f"- **{e['name']}: not answerable.** {h['note']}; reported, no substitute case run.")
+        else:
+            lines.append(f"- **{e['name']}:** flow shift (Z CoV) {h['cov_Z']:.4f}; U CoV {h['cov_U']:.4f}. "
+                         f"H7 **{h['verdict']}**.")
+    lines += ["", "## Per case", "",
+              "| Element | Case | Status | CoV | Max/min flow | Peak fuel (K) | Element dp (kPa) |",
+              "| --- | --- | --- | --- | --- | --- | --- |"]
+    for e in els:
+        for label, c in e["cases"].items():
+            lines.append(f"| {e['name']} | {styles[label][1]} | {c['status']} | {_fmt(c.get('flow_cov'), '.4f')} | "
+                         f"{_fmt(c.get('flow_max_over_min'), '.3f')} | {_fmt(c.get('peak_fuel_T'), '.0f')} | "
+                         f"{_fmt(c.get('dp_element_kPa'), '.1f')} |")
+    path.with_suffix(".md").write_text("\n".join(lines) + "\n")
+    return png
+
+
 # ---------------------------------------------------------------------------
 def transient_report(path, t_show=12.0, frame_dt=0.2, fps=8):
     """Side-by-side runaway animation (GIF) and a short summary from results/transient_*.json."""
@@ -335,7 +391,7 @@ def transient_report(path, t_show=12.0, frame_dt=0.2, fps=8):
 
 
 if __name__ == "__main__":
-    for prefix, fn in (("q1", q1_report), ("q2", q2_report), ("q4", q4_report),
+    for prefix, fn in (("q1", q1_report), ("q2", q2_report), ("q3", q3_report), ("q4", q4_report),
                        ("transient", transient_report)):
         p = newest(prefix)
         if p:

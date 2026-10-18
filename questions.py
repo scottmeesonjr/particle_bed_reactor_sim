@@ -1,9 +1,10 @@
 """
-questions.py -- answers the Tier 1 research questions Q1, Q2 and Q4.
+questions.py -- answers the research questions Q1, Q2, Q4 (Tier 1) and Q3 (Tier 2).
 
     python questions.py q2      # stability map: power vs cold frit share (no-frit onset, cure share)
     python questions.py q4      # point A across the throttle range
     python questions.py q1      # cold- vs hot-frit control across power density
+    python questions.py q3      # flow shift, Z vs U (procedure: docs/model.md A3, A4)
 
 Results go to results/q2_<commit>.{json,md,png} and results/q4_<commit>.{json,md,png}.
 These are analyses, not validation checks: there is no pass/fail. Validation.md
@@ -522,6 +523,67 @@ def q2_step():
     return False
 
 
+
+# ---------------------------------------------------------------------------
+# Q3 (docs/model.md A3 and A4)
+# ---------------------------------------------------------------------------
+Q3_CASES = (("off", False, "Z"), ("Z", True, "Z"), ("U", True, "U"))
+
+
+def single_point_status(res):
+    """A4 single-point rule: Ledinegg or a positive eigenvalue real part = unstable."""
+    if not res["converged"]:
+        return ("out_of_range" if res.get("reason") == "out_of_range" else "no_solution"), None
+    st = model._point_stability(res)
+    return ("unstable" if (st["ledinegg"] or st["max_real"] > 0.0) else "stable"), st
+
+
+def flow_metrics(m):
+    m = np.asarray(m, dtype=float)
+    return dict(flow_cov=float(np.std(m) / np.mean(m)), flow_max_over_min=float(np.max(m) / np.min(m)))
+
+
+def q3_element(name, geom, m_total):
+    out = dict(name=name, cases={})
+    for label, channel, pattern in Q3_CASES:
+        t = time.perf_counter()
+        res = steady.solve_element(1.0, m_total, geom=geom, power_shape="uniform", channel=channel,
+                                   pattern=pattern, pressure_ref="outlet")
+        status, st = single_point_status(res)
+        c = dict(status=status, channel=channel, pattern=pattern, path=res.get("path"),
+                 seconds=time.perf_counter() - t)
+        if res["converged"]:
+            c.update(flow_metrics(res["m"]), m=[float(v) for v in res["m"]],
+                     peak_fuel_T=float(np.nanmax(res["T_fuel_max"])),
+                     dp_element_kPa=float(res["dp_element"]) / 1e3, stability=st)
+        else:
+            c.update(message=str(res.get("message")))
+        out["cases"][label] = c
+    out["h7"] = q3_h7(out["cases"])
+    return out
+
+
+def q3_h7(cases):
+    z, u = cases["Z"], cases["U"]
+    if "flow_cov" not in z or "flow_cov" not in u:
+        return dict(verdict="not answerable", shift_size=z.get("flow_cov"),
+                    note="Z or U has no steady solution inside the property range")
+    return dict(verdict="holds" if u["flow_cov"] < z["flow_cov"] else "does not hold",
+                shift_size=z["flow_cov"], cov_Z=z["flow_cov"], cov_U=u["flow_cov"])
+
+
+def q3():
+    import elements
+    h, dirty = commit()
+    t0 = time.time()
+    big = elements.large_reactor(1.2, "baseline")
+    out = dict(question="Q3", commit=h, uncommitted_changes=dirty, procedure="docs/model.md A3, A4",
+               elements=[q3_element("Ji et al. nominal", None, P.nominal_mass_flow(1.0)),
+                         q3_element("Large reactor (1.2 m, baseline)", big, big["m_dot"])])
+    out["seconds"] = time.time() - t0
+    return out, h
+
+
 if __name__ == "__main__":
     which = sys.argv[1] if len(sys.argv) > 1 else ""
     if which == "q2":                       # fresh full run in one process
@@ -542,5 +604,9 @@ if __name__ == "__main__":
         out, h = q4()
         p = save(out, h, "q4")
         print(f"wrote {p.relative_to(RESULTS.parent)} ({out['seconds']:.0f} s)")
+    elif which == "q3":
+        out, h = q3()
+        p = save(out, h, "q3")
+        print(f"wrote {p.relative_to(RESULTS.parent)} ({out['seconds']:.0f} s)")
     else:
-        sys.exit("usage: python questions.py q1|q1-step|q2|q2-step|q4")
+        sys.exit("usage: python questions.py q1|q1-step|q2|q2-step|q3|q4")

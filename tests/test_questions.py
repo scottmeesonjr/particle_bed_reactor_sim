@@ -47,3 +47,23 @@ def test_q1_partly_when_hot_fails_everywhere():
 def test_q1_no_solution_counts_as_failure_for_h4():
     v = Q.q1_verdict(_designs(lambda pd: "no_solution", lambda pd: "stable"))
     assert v["h4"] and not v["half_a"]
+
+
+# --- Q3 (docs/model.md A3, A4) ---
+def test_q3_flow_metrics_zero_for_equal_split():
+    m = Q.flow_metrics([0.1] * 20)
+    assert abs(m["flow_cov"]) < 1e-12 and abs(m["flow_max_over_min"] - 1.0) < 1e-12
+
+
+def test_q3_h7_holds_when_u_is_more_uniform():
+    h = Q.q3_h7(dict(Z=dict(flow_cov=0.05), U=dict(flow_cov=0.02)))
+    assert h["verdict"] == "holds" and h["shift_size"] == 0.05
+
+
+def test_q3_h7_does_not_hold_when_u_is_not_lower():
+    assert Q.q3_h7(dict(Z=dict(flow_cov=0.02), U=dict(flow_cov=0.02)))["verdict"] == "does not hold"
+
+
+def test_q3_h7_not_answerable_without_solution():
+    h = Q.q3_h7(dict(Z=dict(status="out_of_range"), U=dict(flow_cov=0.02)))
+    assert h["verdict"] == "not answerable"
