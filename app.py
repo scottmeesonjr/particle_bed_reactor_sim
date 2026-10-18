@@ -369,10 +369,21 @@ with tab_model:
 
 with tab_q:
     st.subheader("Questions we're answering")
-    q2, q4 = latest_question("q2"), latest_question("q4")
+    q1, q2, q4 = latest_question("q1"), latest_question("q2"), latest_question("q4")
 
-    st.markdown("**Q1.** Does power density decide whether cold-frit or hot-frit control works?")
-    st.caption("Not run yet.")
+    st.markdown("**Q1.** Does power density decide whether cold-frit or hot-frit control works? "
+                "(Ji et al.'s explanation of the debate; only stability is tested.)")
+    if q1 and q1["md"]:
+        st.markdown(md_section(q1["md"], "Answer"))
+        st.markdown(md_section(q1["md"], "Hypothesis"))
+        if q1["png"]:
+            st.image(q1["png"])
+        st.markdown("*Limits:* " + " ".join(l.lstrip("- ") for l in md_section(q1["md"], "Limits").splitlines()))
+        with st.expander("Every frit design"):
+            st.markdown(md_section(q1["md"], "Per design"))
+        st.caption(provenance(q1))
+    else:
+        st.caption("Not run yet.")
 
     st.markdown("**Q2.** Where does the instability start with no cold frit, and how much cold frit cures it?")
     if q2 and q2["md"]:

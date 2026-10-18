@@ -1,8 +1,9 @@
 """
-questions.py -- answers the Tier 1 research questions Q2 and Q4 (Q1 to follow).
+questions.py -- answers the Tier 1 research questions Q1, Q2 and Q4.
 
     python questions.py q2      # stability map: power vs cold frit share (no-frit onset, cure share)
     python questions.py q4      # point A across the throttle range
+    python questions.py q1      # cold- vs hot-frit control across power density
 
 Results go to results/q2_<commit>.{json,md,png} and results/q4_<commit>.{json,md,png}.
 These are analyses, not validation checks: there is no pass/fail. Validation.md
@@ -48,6 +49,29 @@ Q2 PROCEDURE VERSION 2 (changed before any Q2 result existed; reasons stated)
   - Context map (not the answer): the same map with channel effects off. Kerrebrock's
     parallel-passage analysis gives every passage the same plenum pressure, which is the
     channel-off case, so H2 is compared against this map as well. Reported, labeled.
+
+Q1 (does power density decide whether cold- or hot-frit control works?)
+  Ji et al.'s explanation of the debate: cold-frit control for high power density, hot-frit
+  control for low. The model has no cross-flow, so only the stability part is tested.
+  - Elements: Ji et al. (nominal 20 MW/L, flow by rule D2) and the Tsinghua element
+    (params.T19_ELEMENT, nominal 30 MW/L, flow scaled from its published 0.396 kg/s,
+    outlet-referenced at 8.0 MPa). Uniform axial power.
+  - Frit designs: five per element with the total frit pressure drop held at the published
+    design's value. Cold fraction phi = dp_cold / (dp_cold + dp_hot) in
+    {published, 0.75, 0.50, 0.25, 1 - published}; the last mirrors the published split
+    (as rule D8 does). Set at the element's nominal power with channel effects off, by
+    adjusting both pore sizes at the published porosities.
+  - Power density 1 to 30 MW/L in 0.5 MW/L steps (59 points), swept high to low with the
+    same continuation, halving, and stability rules as Q2. Channel on = the answer;
+    channel off = context.
+  - Answer rule, per element (fixed before running):
+      cold-dominated = published split; hot-dominated = mirrored split.
+      half A: hot-dominated is cured (all converged and stable) over 1-5 MW/L, and is not
+              cured somewhere in 20-30 MW/L;
+      half B: cold-dominated is cured over 20-30 MW/L.
+      "Yes" if A and B; "Partly" if exactly one; "No" if neither.
+  - H4 (validation.md): at 20-30 MW/L the hot-dominated design is unstable or has no
+    solution and the cold-dominated design is stable. Reported per element.
 
 Q4 (point A across the throttle range; no hypothesis)
   - Point A cold frit profile (b = 0.434, c = 1.070, alpha0 = 0.533), cosine axial power.
@@ -266,6 +290,160 @@ def save(out, h, name):
 
 
 # ---------------------------------------------------------------------------
+# Q1
+# ---------------------------------------------------------------------------
+Q1_PD = np.round(np.arange(30.0, 1.0 - 1e-9, -0.5), 3)          # MW/L, high to low
+Q1_PHIS = ("published", 0.75, 0.50, 0.25, "mirrored")
+Q1_LOW, Q1_HIGH = (1.0, 5.0), (20.0, 30.0)
+Q1_ELEMENTS = {
+    "ji": dict(name="Ji et al. element", geom=None, pd_nom=P.POWER_DENSITY / 1e9,
+               cold=(P.COLD_FRIT_PORE, P.COLD_FRIT_EPS), hot=(P.HOT_FRIT_PORE, P.HOT_FRIT_EPS)),
+    "t19": dict(name="Tsinghua element", geom=P.T19_ELEMENT, pd_nom=P.T19_ELEMENT["power_density"] / 1e9,
+                cold=(P.T19_ELEMENT["cold_frit_pore"], P.T19_ELEMENT["cold_frit_eps"]),
+                hot=(P.T19_ELEMENT["hot_frit_pore"], P.T19_ELEMENT["hot_frit_eps"])),
+}
+
+
+def q1_flow(key, f):
+    return P.nominal_mass_flow(f) if key == "ji" else P.T19_ELEMENT["m_dot"] * f
+
+
+def q1_solve(key, f, cold, hot, x0=None, channel=True):
+    e = Q1_ELEMENTS[key]
+    return steady.solve_element(f, q1_flow(key, f), geom=e["geom"], power_shape="uniform",
+                                cold_profile=(lambda s, c=cold: c), hot=hot, channel=channel, x0=x0)
+
+
+def q1_frit_drops(key, cold, hot):
+    r = q1_solve(key, 1.0, cold, hot, channel=False)
+    if not r["converged"]:
+        raise RuntimeError(f"nominal solve failed: {r['message']}")
+    return float(np.mean(r["dp_cold_frit"])), float(np.mean(r["dp_hot_frit"]))
+
+
+def q1_design(key, phi):
+    """Pores giving cold fraction phi with the published total frit drop (nominal, channel off)."""
+    e = Q1_ELEMENTS[key]
+    dc0, dh0 = q1_frit_drops(key, e["cold"], e["hot"])
+    total, phi_pub = dc0 + dh0, dc0 / (dc0 + dh0)
+    if phi == "published":
+        return dict(phi=phi_pub, cold=e["cold"], hot=e["hot"], total_frit_dp=total)
+    target = 1.0 - phi_pub if phi == "mirrored" else float(phi)
+    cold, hot = e["cold"], e["hot"]
+
+    def fit(which, want):
+        def resid(log_d):
+            c = (float(np.exp(log_d)), cold[1]) if which == "cold" else cold
+            h = (float(np.exp(log_d)), hot[1]) if which == "hot" else hot
+            try:
+                dc, dh = q1_frit_drops(key, c, h)
+            except RuntimeError:
+                return 50.0                      # too resistive to solve: far above target
+            return np.log(dc if which == "cold" else dh) - np.log(want)
+        return float(np.exp(brentq(resid, np.log(1e-7), np.log(1e-2), xtol=1e-7)))
+
+    for _ in range(3):                           # the two frits interact weakly; repeat
+        cold = (fit("cold", target * total), cold[1])
+        hot = (fit("hot", (1.0 - target) * total), hot[1])
+    dc, dh = q1_frit_drops(key, cold, hot)
+    return dict(phi=dc / (dc + dh), cold=cold, hot=hot, total_frit_dp=dc + dh)
+
+
+def q1_sweep(key, cold, hot, channel):
+    e = Q1_ELEMENTS[key]
+    fracs = [pd / e["pd_nom"] for pd in Q1_PD]
+    points, x0, prev_f, first_sign = [], None, None, None
+    for f in fracs:
+        r = q1_solve(key, f, cold, hot, x0, channel)
+        if not r["converged"] and prev_f is not None:
+            gap = prev_f - f; step, f_cur, x_cur = gap / 2.0, prev_f, x0
+            while f_cur - f > 1e-12:
+                f_try = max(f, f_cur - step)
+                r = q1_solve(key, f_try, cold, hot, x_cur, channel)
+                if r["converged"]:
+                    f_cur, x_cur = f_try, r["x"]
+                else:
+                    step /= 2.0
+                    if step < gap / 256.0:
+                        break
+        row = dict(power_fraction=float(f), MW_per_L=float(f * e["pd_nom"]))
+        if not r["converged"]:
+            row.update(status="no_solution", reason=str(r["message"])[:200])
+            points.append(row)
+            continue
+        prev_f, x0 = f, r["x"]
+        st = model._point_stability(r)
+        if first_sign is None:
+            first_sign = st["det_sign"]
+        static = st["ledinegg"] or st["det_sign"] != first_sign
+        eigen = st["max_real"] > 0.0
+        row.update(status="unstable" if (static or eigen) else "stable",
+                   static_unstable=bool(static), eigen_unstable=bool(eigen),
+                   max_real=st["max_real"], peak_fuel_T=float(np.nanmax(r["T_fuel_max"])),
+                   dp_element_kPa=float(r["dp_element"] / 1e3))
+        points.append(row)
+    return points
+
+
+def q1_band_cured(points, band):
+    sel = [p for p in points if band[0] - 1e-9 <= p["MW_per_L"] <= band[1] + 1e-9]
+    return bool(sel) and all(p["status"] == "stable" for p in sel)
+
+
+def q1_verdict(designs):
+    hot = [d for d in designs if d["label"] == "mirrored"][0]["points"]
+    cold = [d for d in designs if d["label"] == "published"][0]["points"]
+    half_a = q1_band_cured(hot, Q1_LOW) and not q1_band_cured(hot, Q1_HIGH)
+    half_b = q1_band_cured(cold, Q1_HIGH)
+    hi = lambda pts: [p for p in pts if Q1_HIGH[0] - 1e-9 <= p["MW_per_L"] <= Q1_HIGH[1] + 1e-9]
+    h4 = (all(p["status"] in ("unstable", "no_solution") for p in hi(hot))
+          and all(p["status"] == "stable" for p in hi(cold)))
+    answer = "Yes" if (half_a and half_b) else ("Partly" if (half_a or half_b) else "No")
+    return dict(answer=answer, half_a=half_a, half_b=half_b, h4=h4)
+
+
+Q1_PARTS = RESULTS / "q1_parts"
+
+
+def q1_step():
+    """Next unfinished (element, design) piece of Q1; assemble when all are done."""
+    Q1_PARTS.mkdir(parents=True, exist_ok=True)
+    for key in Q1_ELEMENTS:
+        for lab in Q1_PHIS:
+            f = Q1_PARTS / f"{key}_{lab}.json"
+            if f.exists():
+                continue
+            t = time.time()
+            dsg = q1_design(key, lab)
+            part = dict(element=key, label=str(lab), phi=dsg["phi"], cold=dsg["cold"], hot=dsg["hot"],
+                        total_frit_dp=dsg["total_frit_dp"], commit=commit()[0],
+                        points=q1_sweep(key, dsg["cold"], dsg["hot"], True),
+                        points_channel_off=q1_sweep(key, dsg["cold"], dsg["hot"], False))
+            part["onset"] = onset(part["points"]); part["onset_channel_off"] = onset(part["points_channel_off"])
+            f.write_text(json.dumps(part, default=float))
+            print(f"{key} {lab}: phi {part['phi']:.3f}, cold pore {part['cold'][0]*1e6:.2f} um, hot pore "
+                  f"{part['hot'][0]*1e6:.2f} um; channel on cured={part['onset']['cured']} "
+                  f"(unstable {part['onset']['n_unstable']}, no solution {part['onset']['n_no_solution']}); "
+                  f"channel off cured={part['onset_channel_off']['cured']} "
+                  f"(unstable {part['onset_channel_off']['n_unstable']})  [{time.time()-t:.0f} s]")
+            return True
+    parts = {k: [json.loads((Q1_PARTS / f"{k}_{lab}.json").read_text()) for lab in Q1_PHIS]
+             for k in Q1_ELEMENTS}
+    commits = {d["commit"] for v in parts.values() for d in v}
+    if commits != {commit()[0]}:
+        sys.exit(f"q1 parts come from commits {sorted(map(str, commits))}, but the code is at "
+                 f"{commit()[0]}. Delete results/q1_parts/ and rerun.")
+    h, dirty = commit()
+    out = dict(question="Q1", commit=h, uncommitted_changes=dirty, pd_step=0.5,
+               low_band=Q1_LOW, high_band=Q1_HIGH,
+               elements={k: dict(name=Q1_ELEMENTS[k]["name"], designs=v, verdict=q1_verdict(v))
+                         for k, v in parts.items()})
+    p = save(out, h, "q1")
+    print(f"wrote {p.relative_to(RESULTS.parent)}")
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Q2 in resumable steps (same computation as q2(); each step saves its part)
 # ---------------------------------------------------------------------------
 PARTS = RESULTS / "q2_parts"
@@ -353,9 +531,16 @@ if __name__ == "__main__":
             pass
     elif which == "q2-step":                # one step per call (for short time limits)
         q2_step()
+    elif which == "q1":                     # fresh full run in one process
+        import shutil
+        shutil.rmtree(Q1_PARTS, ignore_errors=True)
+        while q1_step():
+            pass
+    elif which == "q1-step":
+        q1_step()
     elif which == "q4":
         out, h = q4()
         p = save(out, h, "q4")
         print(f"wrote {p.relative_to(RESULTS.parent)} ({out['seconds']:.0f} s)")
     else:
-        sys.exit("usage: python questions.py q2|q2-step|q4")
+        sys.exit("usage: python questions.py q1|q1-step|q2|q2-step|q4")

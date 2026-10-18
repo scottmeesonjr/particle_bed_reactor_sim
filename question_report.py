@@ -187,8 +187,84 @@ def q4_report(path):
     return png
 
 
+# ---------------------------------------------------------------------------
+def q1_report(path):
+    d = json.loads(path.read_text())
+    els = list(d["elements"].items())
+    fig, axes = plt.subplots(len(els), 2, figsize=(12.5, 4.3 * len(els)), sharey=True)
+    for row, (key, e) in enumerate(els):
+        ds = e["designs"]
+        for ax, pk, title in ((axes[row][0], "points_channel_off", "channel effects off (context)"),
+                              (axes[row][1], "points", "channel and plenum on (the answer)")):
+            for i, dsg in enumerate(ds):
+                for p in dsg[pk]:
+                    color, marker, _ = STATUS_STYLE[p["status"]]
+                    ax.scatter(i, p["MW_per_L"], s=16, c=color, marker=marker, linewidths=0)
+            ax.set_xticks(range(len(ds)))
+            ax.set_xticklabels([f"{x['phi']:.2f}" + ("\n(published)" if x["label"] == "published" else
+                                                     "\n(mirrored)" if x["label"] == "mirrored" else "")
+                                for x in ds])
+            ax.set_title(f"{e['name']}: {title}", loc="left", fontsize=11, color=INK)
+            ax.set_xlabel("Cold frit fraction of the frit pressure drop (left: cold-dominated)")
+        axes[row][0].set_ylabel("Power density, MW/L")
+    handles = [plt.Line2D([], [], color=c, marker=m, ls="", label=l) for c, m, l in STATUS_STYLE.values()]
+    fig.legend(handles=handles, frameon=False, loc="lower right", ncol=3, fontsize=9, bbox_to_anchor=(0.995, 0.0))
+    fig.text(0.01, 0.01, "Uniform axial power; total frit pressure drop held at the published design's value.",
+             color=MUTED, fontsize=9)
+    fig.tight_layout(rect=(0, 0.035, 1, 1), w_pad=4)
+    png = path.with_suffix(".png"); fig.savefig(png, dpi=130); plt.close(fig)
+
+    def summ(pts):
+        """Ranges in MW/L, read from each point's own MW_per_L (fractions differ by element)."""
+        if all(p["status"] == "stable" for p in pts):
+            return "stable at every power density"
+        parts = []
+        for status, word in (("stable", "stable"), ("unstable", "unstable"), ("no_solution", "no solution")):
+            v = sorted(p["MW_per_L"] for p in pts if p["status"] == status)
+            if v:
+                parts.append(f"{word} {v[0]:.1f} to {v[-1]:.1f} MW/L ({len(v)} points)")
+        return "; ".join(parts)
+
+    lines = ["# Q1: Does power density decide whether cold- or hot-frit control works?", "",
+             f"Commit {d['commit']}{' (uncommitted changes present)' if d.get('uncommitted_changes') else ''}. "
+             "Five frit designs per element with the total frit pressure drop held at the published value, "
+             "1 to 30 MW/L in 0.5 MW/L steps, uniform power. Only stability is tested (no cross-flow).", "",
+             "## Answer"]
+    for key, e in els:
+        v = e["verdict"]
+        hot = [x for x in e["designs"] if x["label"] == "mirrored"][0]
+        cold = [x for x in e["designs"] if x["label"] == "published"][0]
+        n_hot_stable = sum(p["status"] == "stable" for p in hot["points"])
+        lines.append(f"- **{e['name']}: {v['answer']}.** Cold-dominated (published, fraction "
+                     f"{cold['phi']:.2f}): {summ(cold['points'])}. Hot-dominated (mirrored, fraction "
+                     f"{hot['phi']:.2f}): {summ(hot['points'])}; stable at {n_hot_stable} of "
+                     f"{len(hot['points'])} power densities.")
+    both_no_a = all(not e["verdict"]["half_a"] for _, e in els)
+    both_b = all(e["verdict"]["half_b"] for _, e in els)
+    if both_no_a and both_b:
+        lines.append("- In this model, cold-frit control works at every power density tested and hot-frit "
+                     "control does not work at low power density, so power density does not decide which "
+                     "works. This contradicts the low-power half of Ji et al.'s explanation, for stability.")
+    lines += ["", "## Hypothesis",
+              "- **H4** (at 20-30 MW/L, hot-frit-dominated unstable, cold-frit-dominated stable): "
+              + "; ".join(f"{e['name']}: {'confirmed' if e['verdict']['h4'] else 'not confirmed'}" for _, e in els) + ".",
+              "", "## Limits of this answer",
+              "- Only stability is tested. Ji et al. may prefer hot-frit control at low power density for "
+              "other reasons (temperature uniformity, pressure drop) that this question does not test.",
+              "- The design family holds the total frit pressure drop at the published value. Hot-frit "
+              "designs with a different total were not explored.",
+              "", "## Per design", "| Element | Cold frit fraction | Cold pore (um) | Hot pore (um) | Channel on | Channel off |",
+              "| --- | --- | --- | --- | --- | --- |"]
+    for key, e in els:
+        for x in e["designs"]:
+            lines.append(f"| {e['name']} | {x['phi']:.3f} ({x['label']}) | {x['cold'][0]*1e6:.2f} | "
+                         f"{x['hot'][0]*1e6:.2f} | {summ(x['points'])} | {summ(x['points_channel_off'])} |")
+    path.with_suffix(".md").write_text("\n".join(lines) + "\n")
+    return png
+
+
 if __name__ == "__main__":
-    for prefix, fn in (("q2", q2_report), ("q4", q4_report)):
+    for prefix, fn in (("q1", q1_report), ("q2", q2_report), ("q4", q4_report)):
         p = newest(prefix)
         if p:
             print("wrote", fn(p).relative_to(RESULTS.parent), "and", p.with_suffix(".md").relative_to(RESULTS.parent))
