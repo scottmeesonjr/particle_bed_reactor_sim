@@ -79,8 +79,7 @@ The cases that did solve are reported separately, labeled as observations and no
 - Flow shift along the element, not the bed itself, is what most often pushes these designs past their limits in our model.
 
 ## Limitations
-- [CONFIRM BEFORE SUBMITTING: status of the plenum momentum correction (ρu² vs ½ρu²). Our Tier 1 draft listed it as pending on branch anthonie-steady. Say whether it was merged as a new version, judged not a bug, or is still pending.]
-- The 5000 K property limit applies to hydrogen. Fuel temperature is reported but not range-limited, and fuel above 3800 K is past its melting point; a "stable" label there means the flow is stable, not that the fuel survives. About half of the designs the surrogate labels OK are in this situation.
+- **Known issue.** The plenum pressure-recovery term uses ρu², but our stated assumption (gas leaving the plenum keeps its momentum) implies ½ρu². A correction was committed during development but was overwritten by a later rewrite of the solver, and every result reported here uses ρu². Restoring it means a new model version and rerunning all results, which is our first next step.- The 5000 K property limit applies to hydrogen. Fuel temperature is reported but not range-limited, and fuel above 3800 K is past its melting point; a "stable" label there means the flow is stable, not that the fuel survives. About half of the designs the surrogate labels OK are in this situation.
 - The heat-transfer correlation is below its valid Reynolds range at the hot face in almost every case; it affects fuel temperature, not how flow splits.
 - Properties stop at 5000 K, and hydrogen dissociation is not modeled.
 - Parallel-passage model: no cross-flow or heat conduction between slices.
