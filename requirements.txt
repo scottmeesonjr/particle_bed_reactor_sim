@@ -1,0 +1,8 @@
+numpy
+scipy
+pandas
+CoolProp
+streamlit
+matplotlib
+pytest
+scikit-learn
