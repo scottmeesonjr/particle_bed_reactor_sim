@@ -59,6 +59,44 @@ plt.rcParams.update({
 })
 
 
+
+# ---------------------------------------------------------------------------
+# Validation results (read from the newest runner.py output; never recomputed here)
+# ---------------------------------------------------------------------------
+def latest_validation():
+    import glob, json, os
+    files = sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                          "results", "validation_*.json")), key=os.path.getmtime)
+    return json.load(open(files[-1])) if files else None
+
+
+def verdict_text(r):
+    v = r.get("verdict", "")
+    if v == "see per-reference" and isinstance(r.get("details"), dict):
+        parts = [f"{ref}: {d['verdict']}" for ref, d in r["details"].items()
+                 if isinstance(d, dict) and "verdict" in d]
+        if parts and all(x.endswith(": pass") for x in parts):
+            return "Pass (" + ", ".join(ref for ref, d in r["details"].items()
+                                        if isinstance(d, dict) and "verdict" in d) + ")"
+        return "Mixed (" + "; ".join(parts) + ")" if parts else v
+    return {"pass": "Pass", "fail": "Fail", "not run": "Not run", "error": "Error"}.get(v, v)
+
+
+def detail_text(r):
+    import json
+    if r.get("reason"):
+        return r["reason"]
+    d = r.get("details", {})
+    out = []
+    for k, v in (d.items() if isinstance(d, dict) else []):
+        if isinstance(v, dict):
+            v = {kk: vv for kk, vv in v.items() if kk not in ("verdict", "flags")}
+        if isinstance(v, float):
+            v = round(v, 3)
+        out.append(f"{k}: {json.dumps(v, default=lambda x: round(float(x), 3))}")
+    return "; ".join(out)[:300]
+
+
 def git_hash():
     try:
         return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"],
@@ -228,10 +266,32 @@ with tab_val:
     st.subheader("Checks against published results")
     st.write("Every check and its pass rule were written down and committed before the first run. "
              "Failures are reported, not tuned away.")
+    vrun = latest_validation()
+    if vrun is None:
+        st.info("No validation run found in results/. Run `python3 runner.py` to produce one.")
+    else:
+        meta = vrun["meta"]
+        by_id = {r["id"]: r for r in vrun["results"]}
+        tier1 = [r for r in by_id.values() if r.get("tier") == 1]
+        n_pass = sum(verdict_text(r).startswith("Pass") for r in tier1)
+        n_fail = sum("fail" in verdict_text(r).lower() for r in tier1)
+        st.caption(f"Official run at commit {meta.get('commit')}, params {meta.get('params_version')}, "
+                   f"{meta.get('run_at', '')}"
+                   + (". Channel model OFF (fallback rule)." if meta.get("channel_off") else ".")
+                   + f" Tier 1: {n_pass} passed, {n_fail} failed.")
     ordered = sorted(p.VALIDATION.items(), key=lambda kv: (kv[1]["tier"], int(kv[0][1:])))
-    rows = [{"Check": k, "Tier": v["tier"], "Published result": v["target"],
-             "Pass rule": v["pass_rule"], "Result": "Not run yet"} for k, v in ordered]
+    rows = []
+    for k, v in ordered:
+        r = by_id.get(k) if vrun else None
+        rows.append({"Check": k, "Tier": v["tier"], "Published result": v["target"],
+                     "Pass rule": v["pass_rule"],
+                     "Result": verdict_text(r) if r else "Not run yet",
+                     "Details": detail_text(r) if r else ""})
     st.dataframe(pd.DataFrame(rows), hide_index=True)
+    if vrun and by_id.get("V7", {}).get("verdict") == "fail":
+        st.write("**V7 failed.** The model's no-cold-frit instability onset falls outside the window we "
+                 "set before running (a factor of 3 around Kerrebrock's ~4 MW/L). We report it as a fail "
+                 "and changed nothing in response; see the write-up for our explanation.")
 
 with tab_model:
     st.subheader("What's in the model")
