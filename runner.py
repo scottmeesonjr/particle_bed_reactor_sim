@@ -119,32 +119,47 @@ def _no_cold_frit_onset(m, method):
     return m.find_onset(case(J19B_ELEMENT, cold_frit="none", m_dot="rule_D2"), SWEEP, method)
 
 
+def _sweep_report(o):
+    """Reporting only (no effect on any verdict): which swept powers converged, and which
+    had no steady solution. Points without a solution are not counted as unstable
+    (validation.md amendment A1, item 4), so they must be shown to read a verdict correctly."""
+    mwl = lambda fs: [round(f * p.POWER_DENSITY / 1e9, 3) for f in sorted(fs)]
+    no_sol = o.get("no_solution_fractions", [])
+    return dict(n_swept=len(SWEEP), n_converged=len(SWEEP) - len(no_sol),
+                no_solution_MW_per_L=mwl(no_sol))
+
+
 def v7(m, refs):
     o = _no_cold_frit_onset(m, "slope")
     f = o["onset_fraction"]
     if f is None:
-        return "fail", dict(onset_MW_per_L=None, note="no static instability found in the sweep")
+        return "fail", dict(onset_MW_per_L=None, note="no static instability found in the sweep",
+                            **_sweep_report(o))
     onset = f * p.POWER_DENSITY / 1e9
     lo, hi = p.NASA_THRESHOLD_MW_PER_L / NASA_FACTOR, p.NASA_THRESHOLD_MW_PER_L * NASA_FACTOR
-    return ("pass" if lo <= onset <= hi else "fail"), dict(onset_MW_per_L=onset, allowed=[lo, hi])
+    return ("pass" if lo <= onset <= hi else "fail"), dict(onset_MW_per_L=onset, allowed=[lo, hi],
+                                                           **_sweep_report(o))
 
 
 def v8(m, refs):
     o = m.find_onset(case(J19B_ELEMENT, cold_frit=STRONG_COLD_FRIT, m_dot="rule_D2"), SWEEP, "slope")
     ok = len(o["unstable_fractions"]) == 0
     return ("pass" if ok else "fail"), dict(unstable_MW_per_L=[f * p.POWER_DENSITY / 1e9
-                                                               for f in o["unstable_fractions"]])
+                                                               for f in o["unstable_fractions"]],
+                                            **_sweep_report(o))
 
 
 def v9(m, refs):
-    a = _no_cold_frit_onset(m, "slope")["onset_fraction"]
-    b = _no_cold_frit_onset(m, "eigen")["onset_fraction"]
+    oa, ob = _no_cold_frit_onset(m, "slope"), _no_cold_frit_onset(m, "eigen")
+    a, b = oa["onset_fraction"], ob["onset_fraction"]
+    report = dict(slope_sweep=_sweep_report(oa), eigen_sweep=_sweep_report(ob))
     if a is None and b is None:
-        return "pass", dict(note="neither method found instability; they agree")
+        return "pass", dict(note="neither method found instability; they agree", **report)
     if a is None or b is None:
-        return "fail", dict(slope=a, eigen=b)
+        return "fail", dict(slope=a, eigen=b, **report)
     ok = abs(a - b) <= SWEEP_STEP + 1e-9
-    return ("pass" if ok else "fail"), dict(slope_fraction=a, eigen_fraction=b, step=SWEEP_STEP)
+    return ("pass" if ok else "fail"), dict(slope_fraction=a, eigen_fraction=b, step=SWEEP_STEP,
+                                            **report)
 
 
 def _j19b(m, **kw):
@@ -257,7 +272,8 @@ class _StandIn:
 
     def find_onset(self, c, fractions, method):
         bad = [f for f in fractions if c["cold_frit"] == "none" and f <= 0.21]
-        return dict(unstable_fractions=bad, onset_fraction=max(bad) if bad else None)
+        return dict(unstable_fractions=bad, onset_fraction=max(bad) if bad else None,
+                    no_solution_fractions=[])
 
     def nominal_slice(self, el):
         return dict(dp_cold_frit=900e3 * (2e-6 / el["cold_frit_pore"]) ** 2,

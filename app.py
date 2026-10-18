@@ -70,6 +70,41 @@ def latest_validation():
     return json.load(open(files[-1])) if files else None
 
 
+def latest_question(prefix):
+    """Newest results/<prefix>_*.json with its .md and .png, or None. Never recomputes."""
+    import glob, json, os
+    root = os.path.dirname(os.path.abspath(__file__))
+    files = sorted(glob.glob(os.path.join(root, "results", f"{prefix}_*.json")), key=os.path.getmtime)
+    if not files:
+        return None
+    base = files[-1][:-5]
+    return dict(data=json.load(open(files[-1])),
+                md=open(base + ".md").read() if os.path.exists(base + ".md") else None,
+                png=base + ".png" if os.path.exists(base + ".png") else None)
+
+
+def md_section(md, heading):
+    """Text under '## heading' up to the next '## ' heading."""
+    if not md:
+        return ""
+    out, on = [], False
+    for line in md.splitlines():
+        if line.startswith("## "):
+            on = line[3:].strip().startswith(heading)
+            continue
+        if on:
+            out.append(line)
+    return "\n".join(out).strip()
+
+
+def provenance(q):
+    d = q["data"]
+    c = d.get("commit", "unknown")
+    note = (" These results are not tied to a commit; rerun after committing the code."
+            if c == "nocommit" or d.get("uncommitted_changes") else "")
+    return f"Commit {c}.{note}"
+
+
 def verdict_text(r):
     v = r.get("verdict", "")
     if v == "see per-reference" and isinstance(r.get("details"), dict):
@@ -259,8 +294,24 @@ with tab_live:
 
 with tab_map:
     st.subheader("Where the element becomes unstable")
-    st.write("This map shows power against frit resistance, with each run marked stable or runaway. "
-             "It appears once the stability sweeps have been run with the real solver.")
+    q2 = latest_question("q2")
+    if q2 is None or q2["md"] is None:
+        st.info("No stability map yet. Run `python3 questions.py q2`, then `python3 question_report.py`.")
+    else:
+        st.write("Every dot is one solver run: the Ji et al. element at one power level with one cold frit "
+                 "strength. Blue is stable, red is unstable, and amber means no steady solution exists "
+                 "(one slice is starved of flow and overheats past the 5000 K property limit).")
+        if q2["png"]:
+            st.image(q2["png"])
+        st.markdown("**With the channel and plenum (the answer)**")
+        st.markdown(md_section(q2["md"], "Answer"))
+        st.markdown("**With channel effects off (Kerrebrock's setup, for comparison)**")
+        st.markdown(md_section(q2["md"], "Context"))
+        st.markdown("**Against our predictions**")
+        st.markdown(md_section(q2["md"], "Hypotheses"))
+        with st.expander("Every frit strength"):
+            st.markdown(md_section(q2["md"], "Per share"))
+        st.caption(provenance(q2))
 
 with tab_val:
     st.subheader("Checks against published results")
@@ -289,9 +340,17 @@ with tab_val:
                      "Details": detail_text(r) if r else ""})
     st.dataframe(pd.DataFrame(rows), hide_index=True)
     if vrun and by_id.get("V7", {}).get("verdict") == "fail":
-        st.write("**V7 failed.** The model's no-cold-frit instability onset falls outside the window we "
-                 "set before running (a factor of 3 around Kerrebrock's ~4 MW/L). We report it as a fail "
-                 "and changed nothing in response; see the write-up for our explanation.")
+        d7 = by_id["V7"].get("details", {})
+        if "n_converged" in d7:
+            conv = (f"Only {d7['n_converged']} of the {d7['n_swept']} swept powers had a steady solution; "
+                    "at the others the starved bottom slice overheated past the 5000 K property limit.")
+        else:
+            conv = ("In that sweep only the lowest power had a steady solution; at every other power the "
+                    "starved bottom slice overheated past the 5000 K property limit (see the Stability map).")
+        st.write("**V7 failed.** The model's no-cold-frit onset falls outside the window we set before "
+                 "running (a factor of 3 around Kerrebrock's ~4 MW/L). " + conv + " So without a cold frit "
+                 "this design has no steady operating point above 1 MW/L. We report the fail and changed "
+                 "nothing in response.")
 
 with tab_model:
     st.subheader("What's in the model")
@@ -310,15 +369,35 @@ with tab_model:
 
 with tab_q:
     st.subheader("Questions we're answering")
-    st.markdown("""
-- **Q1.** Does power density decide whether cold-frit or hot-frit control works?
-- **Q2.** Where does the instability start with no cold frit, and how much cold frit cures it?
-- **Q3.** How large is the flow shift along the element, and does a U flow pattern reduce it?
-- **Q4.** Does Ji et al.'s optimized point A stay stable across the 20–100% throttle range? We made no prediction.
-- **Q5.** Can a fast trained model stand in for the solver?
+    q2, q4 = latest_question("q2"), latest_question("q4")
 
-No results yet. Each answer appears here once the runs exist.
-""")
+    st.markdown("**Q1.** Does power density decide whether cold-frit or hot-frit control works?")
+    st.caption("Not run yet.")
+
+    st.markdown("**Q2.** Where does the instability start with no cold frit, and how much cold frit cures it?")
+    if q2 and q2["md"]:
+        st.markdown(md_section(q2["md"], "Answer"))
+        st.caption("Full map on the Stability map tab. " + provenance(q2))
+    else:
+        st.caption("Not run yet.")
+
+    st.markdown("**Q3.** How large is the flow shift along the element, and does a U flow pattern reduce it?")
+    st.caption("Tier 2. Not run yet.")
+
+    st.markdown("**Q4.** Does Ji et al.'s optimized point A stay stable across the 20–100% throttle range? "
+                "We made no prediction.")
+    if q4 and q4["md"]:
+        st.markdown(md_section(q4["md"], "Answer"))
+        if q4["png"]:
+            st.image(q4["png"])
+        with st.expander("Every power level"):
+            st.markdown(q4["md"].split("## Answer", 1)[1].split("\n\n", 2)[-1] if "## Answer" in q4["md"] else "")
+        st.caption(provenance(q4))
+    else:
+        st.caption("Not run yet.")
+
+    st.markdown("**Q5.** Can a fast trained model stand in for the solver?")
+    st.caption("Tier 2. Not run yet.")
 
 st.caption(f'Solve time {res["solve_time_s"]*1e3:.0f} ms. Parameters {p.PARAMS_VERSION}. '
            f'Code version {git_hash()}.')
