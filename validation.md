@@ -62,3 +62,6 @@ These clarify how the criteria above are applied. No validation result existed w
 **3. Sweep step.** Sweeps use the 2.5% step defined above. runner.py previously used 2%; that mismatch was fixed before any run.
 
 **4. Static vs. eigenvalue onsets (V7, V9).** The static onset is the highest swept power at which any slice has d(Δp_slice)/d(m) < 0 (Ledinegg) or the residual Jacobian determinant has changed sign since the first converged sweep point. The eigenvalue onset is the highest swept power with an eigenvalue of positive real part. Points without a converged solution are listed separately and are not counted as unstable.
+
+## Pre-run amendment A2 (committed before any validation run)
+Gas properties are evaluated at P_OP = 7 MPa. Density is scaled by P / P_OP; viscosity, conductivity and cp are taken at P_OP. The pressure drop across an element is under about 1 MPa of 7 MPa, so this is a small approximation. No validation result existed when this was written.
