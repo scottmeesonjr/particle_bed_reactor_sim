@@ -65,3 +65,12 @@ These clarify how the criteria above are applied. No validation result existed w
 
 ## Pre-run amendment A2 (committed before any validation run)
 Gas properties are evaluated at P_OP = 7 MPa. Density is scaled by P / P_OP; viscosity, conductivity and cp are taken at P_OP. The pressure drop across an element is under about 1 MPa of 7 MPa, so this is a small approximation. No validation result existed when this was written.
+## Pre-run amendment A2 (Tier 2; committed before any Tier 2 run)
+
+**1. "Not evaluable."** The published large-reactor Z baseline peaks at 7121 K and the 100 cm case at 5120 K, above the 5000 K property limit (D13). If any case a check needs has no steady solution inside the property range, that check's verdict is "not evaluable (outside property range)". It is reported in the results table and never counted as a pass.
+
+**2. Definitions.** V1: large reactor, L = 1.2 m, Z pattern, 21 kg/s, compared with 872.4 kPa (Energies Table 3). V2: the same case with the U pattern (Table 3). V3: L = 0.8, 1.0, 1.2 m at 14, 17.5, 21 kg/s, compared with 551.8, 693.0, 865.7 kPa (Table 4); beta as defined in docs/model.md A3, which must satisfy beta(0.8) < beta(1.0) < beta(1.2). V4: cold-dominated (cold frit 10 um, porosity 0.2) and hot-dominated (hot frit 400 um) variants of the L = 1.2 m Z baseline.
+
+**3. Pressure reference.** Every large-reactor case runs with 8.0 MPa at the outlet and at the inlet, reported separately (the same rule as the Tsinghua element).
+
+**4. Steady state, not stability.** V1-V4 compare steady states. A case that converges but is unstable is still evaluable; its status is reported.

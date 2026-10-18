@@ -170,3 +170,54 @@ Section 2 left three details open. Decided here, before any validation run:
 - stability.eigen_check with the channel on: flows adjust instantly to satisfy the full
   linearized system (slices plus manifolds) at fixed slice outlet temperatures; with the
   channel off this reduces exactly to the closed form in section 5a.
+
+## Amendment A3 (Tier 2; decided before any Tier 2 run)
+Source for the large reactor: Ji et al., Energies 12(19):3590 (2019), Sections 3.3.1-3.3.3.
+
+### U pattern
+- Z pattern (unchanged): plenum fed at z = 0 and flowing up; channel exits at z = L.
+- U pattern: plenum fed at z = L (the same end the channel exits) and flowing down; the
+  channel is unchanged. The plenum march of section 2 / A2 is applied from z = L downward
+  (steady.plenum_pressures reverses the slice order). p0 is the pressure where the plenum
+  is fed; the pressure-reference rule (3c) is unchanged.
+
+### Large reactor (elements.large_reactor)
+- Geometry from params.T19_LARGE_REACTOR; the 111 mm radial reflector (outside the plenum)
+  is not modeled. Particles 6 mm, bed porosity 0.38, both frits 4 mm pores, cold frit
+  porosity 0.1, hot frit 0.2. Inlet 200 K; 8.0 MPa.
+- Power density held at 1000 MW / bed volume at L = 1.2 m = 1.938 MW/L for every length,
+  as the paper holds power density unchanged. Flow paired with length as published:
+  1.2 m -> 21 kg/s, 1.0 m -> 17.5 kg/s, 0.8 m -> 14 kg/s.
+- Variants (Example C): cold-dominated = cold frit 10 um pores at porosity 0.2;
+  hot-dominated = hot frit 400 um pores (porosity unchanged).
+- Grid: 20 slices x 20 radial steps, as for the other elements.
+
+### beta (V3)
+- beta = max over slices of the bed pressure drop / min over slices of the bed pressure
+  drop (Energies Eq. 11), from steady.py's dp_bed.
+
+### Q3 (flow shift; H7)
+- Elements: Ji et al. nominal (published frits, uniform power, 100%, rule-D2 flow) and the
+  large reactor baseline (L = 1.2 m, 21 kg/s, outlet-referenced 8.0 MPa).
+- Metric: coefficient of variation of slice flows (std / mean) and max/min slice flow, for
+  Z and U with the channel on. Channel off is the zero-shift reference.
+- Answer: flow shift size = Z coefficient of variation. H7 holds on an element if U's
+  coefficient of variation is lower than Z's. Cases without a steady solution are reported
+  as such.
+
+### Q5 (surrogate model; Ji et al.'s stated future work)
+- Element: Ji et al. nominal geometry, channel on, Z pattern, published porosities.
+- Inputs, Latin hypercube (seed 20261018): power fraction 0.20-1.00; cold frit pore
+  1.5-4.0 um (log-uniform); hot frit pore 30-300 um (log-uniform); power shape uniform or
+  cosine (alternating). Flow by rule D2.
+- Labels per case: "ok" = converged and stable; "not ok" = unstable or no solution. Peak fuel
+  temperature for converged cases.
+- Case budget: min(2000, floor(1800 s x workers / measured seconds per case)), measured on
+  the first 20 cases; the count is reported.
+- Split: random 80/20 train / held-out (same seed). Out-of-range set: 200 extra cases with
+  cold frit pore 4.0-6.0 um, everything else as above.
+- Models: scikit-learn GradientBoostingClassifier and GradientBoostingRegressor, default
+  settings, random_state fixed. Fit on the training set only; test sets used once.
+- Answer rule: "yes, it can stand in" if held-out balanced accuracy >= 0.95 and held-out
+  peak-temperature mean absolute error <= 50 K. Out-of-range accuracy is reported
+  separately and does not change the answer. Prediction time vs solver time is reported.
