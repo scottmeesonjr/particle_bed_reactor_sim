@@ -221,3 +221,54 @@ Source for the large reactor: Ji et al., Energies 12(19):3590 (2019), Sections 3
 - Answer rule: "yes, it can stand in" if held-out balanced accuracy >= 0.95 and held-out
   peak-temperature mean absolute error <= 50 K. Out-of-range accuracy is reported
   separately and does not change the answer. Prediction time vs solver time is reported.
+
+## Amendment A4 (Q3 and Q5 procedure details; decided before any Q3 or Q5 run)
+A3 fixed what Q3 and Q5 measure. These are the details it left open, decided before either
+was run. No Q3 or Q5 result existed when they were written.
+
+### Q3
+- Each case is one steady solve (steady.solve_element with its section 3a continuation, from
+  the equal-flow guess). No power sweep.
+- Ji et al. nominal: outlet-referenced at params.P_OUTLET. Large reactor: elements.large_reactor
+  (1.2 m, baseline), outlet-referenced at its own 8.0 MPa, flow 21 kg/s (as V1 and V2).
+- Per element, three cases: channel off (zero-shift reference), Z, and U. For each converged
+  case: coefficient of variation of slice flows (np.std, population, / mean), max/min slice
+  flow, peak fuel temperature, element pressure drop, and stability by the single-point rule
+  below. A case without a steady solution is reported with its reason; no substitute case
+  (other length, power, or pressure reference) is run in its place.
+- H7 on an element: "holds" if U's coefficient of variation < Z's; "does not hold" otherwise;
+  "not answerable" if Z or U has no steady solution.
+
+### Single-point stability (Q3 and Q5)
+- A converged point is unstable if any slice is Ledinegg-unstable or the largest eigenvalue
+  real part is > 0, the rule model.run_steady and the app already use. The determinant-sign
+  test needs a sweep reference point and is not used for isolated points.
+
+### Q5
+- Sampling: scipy.stats.qmc.LatinHypercube(d=3, seed=20261018) draws 2000 points, mapped to
+  power fraction (linear 0.20-1.00), cold frit pore and hot frit pore (log-uniform in A3's
+  ranges). Case k uses uniform power if k is even and cosine if odd. The data set is the
+  first n cases of this sequence, n = the A3 budget; the first 20 are the timing cases and
+  are kept.
+- Out-of-range set: 200 points from LatinHypercube(d=3, seed=20261019), cold frit pore
+  log-uniform 4.0-6.0 um, everything else as above.
+- Each case: steady.solve_element(f, params.nominal_mass_flow(f), shape, cold frit
+  (pore, params.COLD_FRIT_EPS), hot frit (pore, params.HOT_FRIT_EPS), channel on, Z,
+  outlet-referenced), from the equal-flow guess, then the single-point stability rule.
+  Status: "stable", "unstable", "out_of_range", or "no_solution". A case that raises an
+  exception is recorded as "error", excluded from training and testing, and counted.
+- Timing: seconds per case = mean wall time per case measured inside the worker (solve plus
+  stability) over the first 20 cases, run in the same pool. Workers = os.cpu_count().
+- Features: power fraction, log10 cold frit pore, log10 hot frit pore, cosine (0 or 1).
+- Split: sklearn train_test_split(test_size=0.2, random_state=20261018), not stratified.
+- Classifier: label 1 = "ok" (stable), 0 = "not ok" (unstable, out_of_range, no_solution).
+  Regressor: trained on the training cases that converged (stable or unstable), tested on
+  the held-out cases that converged. random_state=20261018 for both.
+- Reported: held-out balanced accuracy, accuracy, and confusion matrix; held-out peak-
+  temperature MAE (K) and max error; out-of-range accuracy, balanced accuracy (if both
+  classes occur), and MAE on its converged cases; prediction time per case (mean over one
+  batch predict of the held-out set, both models) vs the measured solver seconds per case.
+- If the held-out set has only one class, balanced accuracy is undefined and the answer is
+  "not answerable" rather than "yes".
+- The trained models are saved with the results (joblib) so the app can show the surrogate's
+  prediction beside a live solve. The app never retrains.
