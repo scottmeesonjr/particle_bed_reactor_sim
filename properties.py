@@ -153,6 +153,15 @@ _T, _RHO, _MU, _K, _CP, _H = _build_tables()
 
 
 def _check(T, lo=T_MIN, hi=T_MAX):
+    # Fast path for single numbers (most calls inside the solver). Same check, same error:
+    # NaN fails every comparison, so "not (lo <= t <= hi)" also catches NaN and inf.
+    if isinstance(T, (float, int, np.floating, np.integer)) and not isinstance(T, bool):
+        t = float(T)
+        if not (lo <= t <= hi):
+            raise PropertyRangeError(
+                f"Temperature outside the property range {lo:.0f}-{hi:.0f} K "
+                f"(got {t:.0f}-{t:.0f} K)")
+        return t
     T = np.asarray(T, dtype=float)
     if np.any(T < lo) or np.any(T > hi) or np.any(~np.isfinite(T)):
         raise PropertyRangeError(
