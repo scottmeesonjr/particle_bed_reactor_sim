@@ -205,7 +205,7 @@ def git_state():
         except Exception:
             return None
     return dict(commit=git("rev-parse", "--short", "HEAD"),
-                uncommitted_changes=bool(git("status", "--porcelain")))
+                uncommitted_changes=bool(git("status", "--porcelain", "--", ".", ":(exclude)results")))
 
 
 def run_all(model, channel_off=False):

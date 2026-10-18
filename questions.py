@@ -82,7 +82,7 @@ def commit():
     try:
         h = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"],
                                     stderr=subprocess.DEVNULL, text=True).strip()
-        dirty = bool(subprocess.check_output(["git", "status", "--porcelain"],
+        dirty = bool(subprocess.check_output(["git", "status", "--porcelain", "--", ".", ":(exclude)results"],
                                              stderr=subprocess.DEVNULL, text=True).strip())
         return h, dirty
     except Exception:
