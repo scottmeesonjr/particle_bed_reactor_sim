@@ -42,6 +42,7 @@ python runner.py            # validation checks; writes results/
 python runner.py --channel-off   # fallback rule: channel-dependent checks marked not run
 python questions.py q3      # Q3: flow shift, Z vs U; then python question_report.py
 python surrogate.py         # Q5: train and test the surrogate (uses every CPU core)
+python observations.py      # Tier 2 cases that solved (observations, not counted)
 pytest                      # verification tests
 python properties.py        # hydrogen property tables and checks
 python params.py            # input summary and checks

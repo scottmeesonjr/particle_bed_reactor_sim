@@ -67,3 +67,15 @@ def test_q3_h7_does_not_hold_when_u_is_not_lower():
 def test_q3_h7_not_answerable_without_solution():
     h = Q.q3_h7(dict(Z=dict(status="out_of_range"), U=dict(flow_cov=0.02)))
     assert h["verdict"] == "not answerable"
+
+
+# --- Tier 2 observations (docs/model.md A5) ---
+def test_observations_mirror_the_v3_v4_cases_and_apply_no_rule():
+    import observations as O
+    import runner
+    assert O.V3_LENGTHS == tuple(runner.V3_TARGETS)
+    assert O.REFS == ("outlet", "inlet")
+    row = O._row(dict(status="out_of_range", dp_total=float("nan"), peak_fuel_T=float("nan")))
+    assert row == dict(status="out_of_range")                 # nothing recorded for a missing case
+    assert "verdict" not in O._row(dict(status="stable", dp_total=5e5, beta=1.1, peak_fuel_T=3000.0, flow_cov=0.01))
+    assert abs(O.pct_diff(110.0, 100.0) - 10.0) < 1e-12

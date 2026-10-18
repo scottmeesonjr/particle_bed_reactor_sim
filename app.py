@@ -443,6 +443,16 @@ with tab_val:
                  "this design has no steady operating point above 1 MW/L. We report the fail and changed "
                  "nothing in response.")
 
+    obs = latest_question("tier2_obs")
+    if obs and obs["md"]:
+        with st.expander("Tier 2: the large-reactor cases that did solve (observations, not counted)"):
+            st.write("V1–V4 are not evaluable: each needs a case that has no steady solution below the "
+                     "5000 K limit of our hydrogen data. The cases that did solve are shown here for "
+                     "completeness. No pass rule is applied, and none of this counts toward a check.")
+            st.markdown(md_section(obs["md"], "V3"))
+            st.markdown(md_section(obs["md"], "V4"))
+            st.caption(provenance(obs))
+
 with tab_model:
     st.subheader("What's in the model")
     st.markdown(f"""
