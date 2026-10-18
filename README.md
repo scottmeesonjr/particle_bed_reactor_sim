@@ -79,3 +79,6 @@ python params.py            # input summary and checks
 - Our gas temperatures run hotter than the Tsinghua papers' because NIST data gives about 13–15% less enthalpy rise than their property model. We compare trends, not absolute temperatures.
 
 ## How we used AI
+
+- AI was utilized in writing code.
+- AI was not utilized for theory or governing equations.
