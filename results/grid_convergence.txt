@@ -1,0 +1,9 @@
+Grid convergence, commit 1315352
+Case: cosine power 80%, channel on, published frits (not a validation case)
+    grid    status  peak fuel T (K)  dp total (kPa)  change T  change dp  time (s)
+ 10x10      stable           3857.5          446.86                           0.09
+ 20x20      stable           3868.1          446.91     0.27%      0.01%      0.32
+ 40x40      stable           3869.0          446.92     0.02%      0.00%      1.22
+
+20x20 vs 40x40 within 1%: YES -> use 20x20
+Recorded solve time at 20x20: 0.32 s
