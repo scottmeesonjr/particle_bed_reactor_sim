@@ -39,7 +39,8 @@ def test_app_contract_keys():
     assert out["fuel_T"].shape == (20, 21)
 
 
-def test_app_reports_unbuilt_channel():
-    if not model.CHANNEL_AVAILABLE:
-        with pytest.raises(NotImplementedError):
-            model.solve(1.0, "uniform", True, 0.5, False, 1e-4, 0.0, 9, True)
+def test_app_runs_with_channel_on():
+    assert model.CHANNEL_AVAILABLE
+    out = model.solve(0.8, "cosine", True, 0.5, False, 1e-4, 0.0, 9, True)
+    assert out["status"] in ("stable", "runaway")
+    assert out["fuel_T"].shape == (20, 21)

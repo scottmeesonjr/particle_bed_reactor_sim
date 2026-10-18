@@ -154,3 +154,19 @@ Both take the dict returned by steady.solve_element at a converged point.
 - eigen_check(result) -> {"max_real": float, "oscillatory": bool}
   max_real = largest real part of the transient-model Jacobian eigenvalues (section 5);
   oscillatory = that eigenvalue has a nonzero imaginary part.
+## Amendment A2 (channel and plenum details; decided before any validation run)
+Section 2 left three details open. Decided here, before any validation run:
+- Slice-centre convention: each slice's gas enters the channel (or leaves the plenum) spread
+  evenly over the slice height. The flow at a slice centre is taken halfway through that
+  slice's injection or draw: W_ch,i = sum_{j<i} m_j + m_i/2, W_pl,i = sum_{j>i} m_j + m_i/2.
+  The channel temperature at a centre mixes enthalpy the same way. The plenum is fed with
+  sum(m_i), which equals m_total at a solution.
+- Friction below Petukhov's range (Re < 3000, only near the closed manifold ends, where W is
+  small): f_D = max(64/Re, Petukhov(max(Re, 3000))). Continuous; laminar at very low Re.
+- Marching: density at each node is evaluated at the upstream node's pressure, so the
+  momentum terms telescope exactly from end to end. Friction uses the segment-mean flow and
+  density; channel viscosity at the segment-mean temperature. End segments are dz/2.
+- The U pattern is Tier 2 and not implemented (raises NotImplementedError).
+- stability.eigen_check with the channel on: flows adjust instantly to satisfy the full
+  linearized system (slices plus manifolds) at fixed slice outlet temperatures; with the
+  channel off this reduces exactly to the closed form in section 5a.

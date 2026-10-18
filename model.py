@@ -68,8 +68,8 @@ except ImportError:            # not written yet
 
 IS_FAKE = False
 
-# Set to True once steady.py supports channel=True and its tests pass.
-CHANNEL_AVAILABLE = False
+# steady.py supports channel=True (Z pattern; docs/model.md section 2, Amendment A2).
+CHANNEL_AVAILABLE = True
 
 N = P.N_SLICES
 N_R = P.N_RADIAL
@@ -280,9 +280,9 @@ def solve(power_fraction, power_shape, cold_frit_on, cold_frit_porosity,
 
     # Radial profiles for the bed map, if slice.py exposes them (docs/model.md section 1a).
     gas_T = fuel_T = r = None
-    if _supports(sl.slice_dp, "profile") and not channel_on:   # channel on: per-slice pressures differ
+    if _supports(sl.slice_dp, "profile"):
         si = res["slice_inputs"]
-        prof = [sl.slice_dp(res["m"][i], si["q"][i], si["p_in"], si["T_in"], si["colds"][i], si["hot"],
+        prof = [sl.slice_dp(res["m"][i], si["q"][i], si["p_slices"][i], si["T_in"], si["colds"][i], si["hot"],
                             si["dz"], si["n_r"], geom=si["geom"], profile=True) for i in range(n_slices)]
         r = np.asarray(prof[0]["r_nodes"])
         gas_T = np.array([p_["T_gas_nodes"] for p_ in prof])
