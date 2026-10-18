@@ -263,8 +263,80 @@ def q1_report(path):
     return png
 
 
+# ---------------------------------------------------------------------------
+def transient_report(path, t_show=12.0, frame_dt=0.2, fps=8):
+    """Side-by-side runaway animation (GIF) and a short summary from results/transient_*.json."""
+    from matplotlib.animation import FuncAnimation, PillowWriter
+    import numpy as np
+    d = json.loads(path.read_text())
+    cases = [("with_cold_frit", "With the cold frit"), ("no_cold_frit", "Without a cold frit")]
+    N = len(d["cases"]["with_cold_frit"]["T_steady"])
+    slices = np.arange(1, N + 1)
+    times = np.round(np.arange(0.0, t_show + 1e-9, frame_dt), 6)
+
+    def frame_at(case, t):
+        fr = case["frames"]
+        k = max(i for i, f in enumerate(fr) if f["t"] <= t + 1e-9)
+        return fr[k], fr[k]["t"] < t - 1e-9 and case["outcome"] == "runaway"
+
+    fig, axes = plt.subplots(2, 2, figsize=(11, 6.2), gridspec_kw=dict(height_ratios=[3, 2]))
+    title = fig.suptitle("", x=0.01, ha="left", fontsize=13, color=INK)
+
+    def draw(t):
+        title.set_text(f"t = {t:4.1f} s   (slice {d['demo']['slice'] + 1} started {d['demo']['kick_K']:.0f} K hot)")
+        for col, (key, name) in enumerate(cases):
+            c = d["cases"][key]
+            fr, ended = frame_at(c, t)
+            T = np.array(fr["T"]); m = np.array(fr["m"]); T0 = np.array(c["T_steady"]); m0 = np.array(c["m_steady"])
+            ax = axes[0][col]; ax.clear()
+            colors = [RED if Ti > P.T_LIMIT else (AMBER if Ti > T0i + 25 else BLUE) for Ti, T0i in zip(T, T0)]
+            ax.bar(slices, T, color=colors, width=0.8)
+            ax.axhline(P.T_LIMIT, color=RED, lw=1)
+            ax.text(0.6, P.T_LIMIT + 40, "fuel limit 3,800 K", color=RED, fontsize=8, va="bottom")
+            ax.set_ylim(2500, 5000); ax.set_xlim(0.3, N + 0.7)
+            ax.set_ylabel("Gas leaving slice, K"); ax.set_xticks([1, 5, 10, 15, 20])
+            if ended:
+                ax.set_title(f"{name}: RUNAWAY at {c['t_end']:.1f} s",
+                             loc="left", fontsize=11, color=RED, fontweight="bold")
+            else:
+                ax.set_title(name, loc="left", fontsize=11, color=INK)
+            ax2 = axes[1][col]; ax2.clear()
+            change = (m / m0 - 1.0) * 100
+            ax2.bar(slices, change, color=[RED if x < -1 else MUTED for x in change], width=0.8)
+            ax2.axhline(0, color=MUTED, lw=0.8)
+            ax2.set_ylim(-60, 15); ax2.set_xlim(0.3, N + 0.7)
+            ax2.set_ylabel("Flow change, %"); ax2.set_xlabel("Slice"); ax2.set_xticks([1, 5, 10, 15, 20])
+        return []
+
+    anim = FuncAnimation(fig, lambda i: draw(times[min(i, len(times) - 1)]),
+                         frames=len(times) + int(1.5 * fps), blit=False)
+    fig.subplots_adjust(left=0.08, right=0.98, top=0.88, bottom=0.10, wspace=0.28, hspace=0.35)
+    gif = path.with_suffix(".gif")
+    anim.save(gif, writer=PillowWriter(fps=fps))
+    plt.close(fig)
+
+    a, b = d["cases"]["with_cold_frit"], d["cases"]["no_cold_frit"]
+    lines = ["# Runaway demonstration", "",
+             f"Commit {d['commit']}{' (uncommitted changes present)' if d.get('uncommitted_changes') else ''}. "
+             f"Ji et al. element at {a['power_MW_per_L']:.0f} MW/L, uniform power, channel effects off "
+             "(Kerrebrock's setup). Slice {0} starts {1:.0f} K hotter than steady; nothing else changes. "
+             .format(d['demo']['slice'] + 1, d['demo']['kick_K'])
+             + "Model: docs/model.md section 5, flows readjusting instantly.", "",
+             "## Result",
+             f"- **With the cold frit:** {a['outcome']}; the disturbance decays (eigenvalue "
+             f"{a['eigen_max_real']:+.2f} 1/s, so it shrinks by a factor of e every "
+             f"{1/abs(a['eigen_max_real']):.2f} s).",
+             f"- **Without a cold frit:** {b['outcome']}. The hot slice loses flow, heats further, and its "
+             f"outlet gas passes the {P.T_LIMIT:,.0f} K fuel limit at {b['t_fuel_limit']:.1f} s and leaves "
+             f"the 5000 K property range at {b['t_end']:.1f} s (eigenvalue {b['eigen_max_real']:+.2f} 1/s: "
+             f"the disturbance grows by a factor of e every {1/abs(b['eigen_max_real']):.1f} s at first)."]
+    path.with_suffix(".md").write_text("\n".join(lines) + "\n")
+    return gif
+
+
 if __name__ == "__main__":
-    for prefix, fn in (("q1", q1_report), ("q2", q2_report), ("q4", q4_report)):
+    for prefix, fn in (("q1", q1_report), ("q2", q2_report), ("q4", q4_report),
+                       ("transient", transient_report)):
         p = newest(prefix)
         if p:
             print("wrote", fn(p).relative_to(RESULTS.parent), "and", p.with_suffix(".md").relative_to(RESULTS.parent))

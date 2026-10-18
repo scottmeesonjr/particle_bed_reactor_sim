@@ -232,8 +232,8 @@ for flag in res["flags"]:
 # ---------------------------------------------------------------------------
 # Tabs
 # ---------------------------------------------------------------------------
-tab_live, tab_map, tab_val, tab_model, tab_q = st.tabs(
-    ["Fuel element", "Stability map", "Validation", "What's in the model", "Open questions"])
+tab_live, tab_map, tab_run, tab_val, tab_model, tab_q = st.tabs(
+    ["Fuel element", "Stability map", "Runaway", "Validation", "What's in the model", "Open questions"])
 
 with tab_live:
     # Bed temperature map (the paper's Fig. 8 view): axial along x, radial down the page
@@ -312,6 +312,25 @@ with tab_map:
         with st.expander("Every frit strength"):
             st.markdown(md_section(q2["md"], "Per share"))
         st.caption(provenance(q2))
+
+with tab_run:
+    st.subheader("Watching a runaway happen")
+    tr = latest_question("transient")
+    if tr is None or tr["md"] is None:
+        st.info("No runaway demonstration yet. Run `python3 transient.py`, then `python3 question_report.py`.")
+    else:
+        import glob, os
+        gifs = sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "results",
+                                             f"transient_{tr['data']['commit']}.gif")), key=os.path.getmtime)
+        st.write("The same fuel element at the same power, twice. In both, one slice starts 20 K hotter "
+                 "than normal. With a cold frit, the extra heat is carried away and everything settles. "
+                 "Without one, the hot slice's gas thickens, it loses flow, gets hotter, and runs away.")
+        if gifs:
+            st.image(gifs[-1])
+        st.markdown(md_section(tr["md"], "Result"))
+        st.caption("Each frame is the full model stepped forward in time (docs/model.md section 5). "
+                   "Its growth and decay rates match the eigenvalue stability test, which is its "
+                   "linearization. " + provenance(tr))
 
 with tab_val:
     st.subheader("Checks against published results")
