@@ -1,0 +1,95 @@
+{
+  "commit": "19ce0e1",
+  "uncommitted_changes": false,
+  "procedure": "docs/model.md A5 (observations, not counted)",
+  "v3": {
+    "outlet": {
+      "0.8": {
+        "status": "stable",
+        "dp_kPa": 550.0295676023401,
+        "beta": 2.2437332380031343,
+        "peak_fuel_T": 4296.0870847353535,
+        "flow_cov": 0.269895074997164,
+        "published_dp_kPa": 551.8,
+        "dp_diff_pct": -0.3208467556469508
+      },
+      "1.0": {
+        "status": "stable",
+        "dp_kPa": 684.0556554325707,
+        "beta": 3.347407078960986,
+        "peak_fuel_T": 5101.074839720146,
+        "flow_cov": 0.41138389320398466,
+        "published_dp_kPa": 693.0,
+        "dp_diff_pct": -1.2906702117502613
+      },
+      "1.2": {
+        "status": "out_of_range",
+        "published_dp_kPa": 865.7
+      }
+    },
+    "inlet": {
+      "0.8": {
+        "status": "stable",
+        "dp_kPa": 591.719937215291,
+        "beta": 2.2505598061373275,
+        "peak_fuel_T": 4298.451376030928,
+        "flow_cov": 0.2706278553740914,
+        "published_dp_kPa": 551.8,
+        "dp_diff_pct": 7.234493877363365
+      },
+      "1.0": {
+        "status": "stable",
+        "dp_kPa": 751.6414020645907,
+        "beta": 3.372702653442562,
+        "peak_fuel_T": 5109.5236318339685,
+        "flow_cov": 0.4135115347439576,
+        "published_dp_kPa": 693.0,
+        "dp_diff_pct": 8.461962779883217
+      },
+      "1.2": {
+        "status": "out_of_range",
+        "published_dp_kPa": 865.7
+      }
+    }
+  },
+  "v4": {
+    "outlet": {
+      "baseline": {
+        "status": "out_of_range"
+      },
+      "cold_dominated": {
+        "status": "stable",
+        "dp_kPa": 2063.446648698654,
+        "beta": 1.5188756437084128,
+        "peak_fuel_T": 3612.546417405946,
+        "flow_cov": 0.1154824087133692
+      },
+      "hot_dominated": {
+        "status": "stable",
+        "dp_kPa": 2377.525894066518,
+        "beta": 1.4776235861009461,
+        "peak_fuel_T": 3670.72767301857,
+        "flow_cov": 0.1290339126116692
+      }
+    },
+    "inlet": {
+      "baseline": {
+        "status": "out_of_range"
+      },
+      "cold_dominated": {
+        "status": "stable",
+        "dp_kPa": 2890.3881000878764,
+        "beta": 1.6694483300483094,
+        "peak_fuel_T": 3627.105452888659,
+        "flow_cov": 0.12163330267009297
+      },
+      "hot_dominated": {
+        "status": "stable",
+        "dp_kPa": 3606.5948454413583,
+        "beta": 1.5251325965162448,
+        "peak_fuel_T": 3696.803234661261,
+        "flow_cov": 0.13970281826177544
+      }
+    }
+  }
+}
