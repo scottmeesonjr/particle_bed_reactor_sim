@@ -198,6 +198,7 @@ RE_M_MIN_KTA_DP = 10.0       # KTA bed pressure drop valid for 10 < Re_m < 1e5  
 RE_M_MAX_KTA_DP = 1.0e5
 EPS_RANGE_KTA_DP = (0.36, 0.42)  #                                    S [R22]
 RE_MIN_KTA_HT = 100.0        # KTA heat transfer lower limit (v2 audit, D4)
+RE_MIN_PETUKHOV = 3000.0   # below this, manifold friction uses max(64/Re, Petukhov(3000)); model.md Amendment A2
 # Re_m = Re / (1 - eps). Runs below these are FLAGGED, never stopped.
 
 # ============================================================================

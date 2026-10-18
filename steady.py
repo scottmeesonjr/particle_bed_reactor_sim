@@ -32,7 +32,7 @@ N_SHAPE_AVG = 50       # points per slice for the slice-averaged power shape (se
 FD_REL_STEP = 1.0e-6   # relative finite-difference step for the Jacobian
 LAMBDA_STEP0 = 0.25    # continuation: first homotopy step (3a)
 LAMBDA_STEP_MIN = 1.0 / 256.0
-RE_PETUKHOV_MIN = 3000.0   # A2: Petukhov used at max(Re, 3000), floored by laminar 64/Re
+RE_PETUKHOV_MIN = P.RE_MIN_PETUKHOV   # A2: Petukhov used at max(Re, 3000), floored by laminar 64/Re
 STOP_FLAGS = ("out_of_range", "pressure_collapse")
 FLAG_KEYS = ("re_m_low", "re_ht_low", "out_of_range", "pressure_collapse", "fuel_over_limit")
 
