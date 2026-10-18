@@ -381,6 +381,9 @@ with tab_ai:
                        over=peak is not None and peak > p.T_LIMIT)
                 metric(m2, f"{secs * 1e3:,.1f} ms" if secs >= 1e-3 else f"{secs * 1e6:,.0f} µs", "Time to answer")
 
+        if phys.get("peak_fuel_T") is not None and phys["peak_fuel_T"] > p.T_LIMIT:
+            st.info(f"The fuel here is past its {p.T_LIMIT:,.0f} K melting point. \"Stable\" means the hydrogen "
+                    "flow is stable, not that the fuel survives.")
         agree = phys_ok == pred["ok"]
         if phys["status"] == "error":
             st.warning("The solver raised an error at this setting, so there is nothing to compare against.")
@@ -393,6 +396,9 @@ with tab_ai:
             st.warning("This design is outside the range the surrogate was trained on (cold frit pore 1.5–4 µm). "
                        "Its answer here is an extrapolation; the scorecard below shows how well that goes.")
 
+        st.caption("What \"OK\" means: the solver finds a steady state that is stable. About half of the training "
+                   "designs labeled OK run their fuel past the 3,800 K melting point, so OK does not mean the fuel "
+                   "survives.")
         st.markdown("**Scorecard on cases it never saw** (rule fixed before training: balanced accuracy at least "
                     "0.95 and peak-temperature error at most 50 K)")
         st.markdown(md_section(q5["md"], "Answer"))
@@ -451,6 +457,8 @@ with tab_val:
                      "completeness. No pass rule is applied, and none of this counts toward a check.")
             st.markdown(md_section(obs["md"], "V3"))
             st.markdown(md_section(obs["md"], "V4"))
+            st.caption("The 80 and 100 cm cases run their fuel past the 3,800 K melting point, so their stability "
+                       "labels are not physical. Pressure drop and beta do not depend on fuel properties.")
             st.caption(provenance(obs))
 
 with tab_model:
@@ -465,7 +473,7 @@ with tab_model:
 - **Mass flow:** set so the gas leaves at 3000 K using NIST enthalpy, {p.nominal_mass_flow():.3f} kg/s at full power. It scales with power when throttled.
 - **Stability:** a slice is statically unstable where its pressure drop falls as flow rises. A second, independent eigenvalue test checks the same boundary.
 
-**Limitations.** Paths don't exchange flow or heat sideways, as real beds do. Frits are treated as uniform resistances. Hydrogen dissociation above about 3500 K is ignored. Our temperatures run hotter than the Tsinghua papers' because NIST data gives about 13–15% less enthalpy rise than their property model, so we compare trends, not absolute temperatures.
+**Limitations.** Paths don't exchange flow or heat sideways, as real beds do. Frits are treated as uniform resistances. Hydrogen dissociation above about 3500 K is ignored. Our temperatures run hotter than the Tsinghua papers' because NIST data gives about 13–15% less enthalpy rise than their property model, so we compare trends, not absolute temperatures. The 5000 K property limit applies to hydrogen temperatures. Fuel temperature is reported but not range-limited, and fuel above 3800 K is past its melting point. The eigenvalue test's fuel heat capacity is only valid below 3805 K, so a "stable" label there means the flow is stable, not that the fuel survives.
 """)
 
 with tab_q:

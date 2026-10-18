@@ -81,6 +81,8 @@ python params.py            # input summary and checks
 - Flow paths do not exchange flow or heat sideways, as they do in a real bed.
 - Frits are modeled as uniform resistances.
 - Hydrogen dissociation above about 3500 K is not modeled; properties stop at 5000 K.
+- The 5000 K property limit applies to hydrogen temperatures. Fuel temperature is reported but not range-limited, and fuel above 3800 K is past its melting point. The eigenvalue test's fuel heat capacity is only valid below 3805 K, so a "stable" label there means the flow is stable, not that the fuel survives.
+- Q5: about half of the designs the surrogate labels "OK" run their fuel past 3800 K. "OK" means the model finds a stable steady state, not that the fuel survives.
 - Our gas temperatures run hotter than the Tsinghua papers' because NIST data gives about 13–15% less enthalpy rise than their property model. We compare trends, not absolute temperatures.
 
 ## How we used AI
