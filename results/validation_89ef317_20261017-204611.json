@@ -1,0 +1,201 @@
+{
+  "meta": {
+    "params_version": "v3",
+    "channel_off": false,
+    "run_at": "2026-10-17T20:46:11",
+    "commit": "89ef317",
+    "uncommitted_changes": false
+  },
+  "results": [
+    {
+      "id": "V5",
+      "tier": 1,
+      "target": "T19 element, cold-frit-dominated: dp = 1189.2 kPa",
+      "pass_rule": "dp within +/-25%; stable",
+      "verdict": "see per-reference",
+      "details": {
+        "outlet": {
+          "verdict": "pass",
+          "dp_kPa": 1060.7939262129664,
+          "status": "stable",
+          "flags": [
+            "Heat transfer correlation is below its valid Reynolds range at the hot face."
+          ]
+        },
+        "inlet": {
+          "verdict": "pass",
+          "dp_kPa": 1225.2886759333946,
+          "status": "stable",
+          "flags": [
+            "Heat transfer correlation is below its valid Reynolds range at the hot face."
+          ]
+        }
+      },
+      "seconds": 0.613078
+    },
+    {
+      "id": "V6",
+      "tier": 1,
+      "target": "T19 element, hot-frit-dominated (rule D8)",
+      "pass_rule": "instability, or no steady solution with all temperatures below the property limit (5000 K, decision D13)",
+      "verdict": "see per-reference",
+      "details": {
+        "D8": {
+          "original": {
+            "dp_cold_frit": 1082963.8256763527,
+            "dp_hot_frit": 45939.65817107633,
+            "cold_share": 0.9593059470287851
+          },
+          "swapped": {
+            "dp_cold_frit": 45939.65817108005,
+            "dp_hot_frit": 1082963.8256763518,
+            "cold_share": 0.04069405297121811
+          },
+          "cold_frit_pore": 9.697862332439714e-06,
+          "hot_frit_pore": 1.8428520596541828e-05
+        },
+        "outlet": {
+          "verdict": "pass",
+          "status": "runaway",
+          "peak_fuel_T": 4117.097831370785,
+          "flags": [
+            "Heat transfer correlation is below its valid Reynolds range at the hot face.",
+            "Fuel is above the 3,800 K limit in some slices."
+          ]
+        },
+        "inlet": {
+          "verdict": "pass",
+          "status": "runaway",
+          "peak_fuel_T": 4119.634976531972,
+          "flags": [
+            "Heat transfer correlation is below its valid Reynolds range at the hot face.",
+            "Fuel is above the 3,800 K limit in some slices."
+          ]
+        }
+      },
+      "seconds": 0.826953
+    },
+    {
+      "id": "V7",
+      "tier": 1,
+      "target": "No cold frit at design exit temperature [K93]",
+      "pass_rule": "static instability below a power density within a factor of 3 of 4 MW/L",
+      "verdict": "fail",
+      "details": {
+        "onset_MW_per_L": 1.0,
+        "allowed": [
+          1.3333333333333333,
+          12.0
+        ]
+      },
+      "seconds": 8.819307
+    },
+    {
+      "id": "V8",
+      "tier": 1,
+      "target": "Strong cold frit [K93]",
+      "pass_rule": "V7 instability disappears",
+      "verdict": "pass",
+      "details": {
+        "unstable_MW_per_L": []
+      },
+      "seconds": 10.834416
+    },
+    {
+      "id": "V9",
+      "tier": 1,
+      "target": "Ledinegg check",
+      "pass_rule": "eigenvalue and pressure-drop-slope onsets agree within one sweep step",
+      "verdict": "pass",
+      "details": {
+        "slope_fraction": 0.05,
+        "eigen_fraction": 0.05,
+        "step": 0.025
+      },
+      "seconds": 17.469589
+    },
+    {
+      "id": "V10",
+      "tier": 1,
+      "target": "J19b design, uniform power, 0.505 kg/s: dp = 529.8 kPa",
+      "pass_rule": "dp within +/-25%",
+      "verdict": "pass",
+      "details": {
+        "dp_kPa": 512.0388148328681,
+        "flags": [
+          "Heat transfer correlation is below its valid Reynolds range at the hot face.",
+          "Fuel is above the 3,800 K limit in some slices."
+        ]
+      },
+      "seconds": 0.421158
+    },
+    {
+      "id": "V11",
+      "tier": 1,
+      "target": "Cosine vs. uniform power (3348.4 -> 3905.5 K)",
+      "pass_rule": "peak temperature rises; dp changes < 2%",
+      "verdict": "pass",
+      "details": {
+        "peak_uniform_K": 4027.3759251978627,
+        "peak_cosine_K": 4375.834773457188,
+        "dp_uniform_kPa": 512.0388148328681,
+        "dp_cosine_kPa": 511.7431176905138
+      },
+      "seconds": 0.669759
+    },
+    {
+      "id": "V12",
+      "tier": 1,
+      "target": "J19b point A, cosine power (3147.6 K, 414.4 kPa)",
+      "pass_rule": "peak T and dp both fall; dp within +/-25% of 414.4 kPa",
+      "verdict": "pass",
+      "details": {
+        "peak_base_K": 4375.834773457188,
+        "peak_A_K": 3731.198432372021,
+        "dp_base_kPa": 511.7431176905138,
+        "dp_A_kPa": 394.57375156340936
+      },
+      "seconds": 0.639207
+    },
+    {
+      "id": "V1",
+      "tier": 2,
+      "target": "T19 large reactor, Z: dp = 872.4 kPa",
+      "pass_rule": "within +/-25%",
+      "verdict": "not run",
+      "reason": "Tier 2 check not attempted"
+    },
+    {
+      "id": "V2",
+      "tier": 2,
+      "target": "Z vs. U",
+      "pass_rule": "U has lower peak temperature; dp changes < 2%",
+      "verdict": "not run",
+      "reason": "Tier 2 check not attempted"
+    },
+    {
+      "id": "V3",
+      "tier": 2,
+      "target": "Core heights 80/100/120 cm",
+      "pass_rule": "dp within +/-25% each; beta decreases with shorter core",
+      "verdict": "not run",
+      "reason": "Tier 2 check not attempted"
+    },
+    {
+      "id": "V4",
+      "tier": 2,
+      "target": "Frit-dominance variants",
+      "pass_rule": "both lower peak temperature vs. baseline",
+      "verdict": "not run",
+      "reason": "Tier 2 check not attempted"
+    },
+    {
+      "id": "V13",
+      "tier": 3,
+      "target": "Reproduction-mode optimizer, cosine power",
+      "pass_rule": "porosity peak upstream of power peak (b < 0.5)",
+      "verdict": "not run",
+      "reason": "Tier 3 check not attempted"
+    }
+  ]
+}
